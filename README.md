@@ -20,21 +20,11 @@ media_manager/
 ├── lib/  
 │   ├── core/  
 │   │   ├── constants/       # Cores, estilos, strings, tamanhos  
-│   │   ├── utils/           # Helpers, extensions, formatters  
-│   │   ├── errors/          # Exceções customizadas  
-│   │   └── routes/          # Rotas nomeadas (se necessário)  
-│   │  
-│   ├── data/                # Camada de dados  
-│   │   ├── datasources/     # Local (FileSystem) ou APIs futuras  
-│   │   ├── models/          # Entidades (Movie, Serie, Folder)  
-│   │   └── repositories/    # Implementações dos repositórios  
-│   │  
-│   ├── domain/              # Lógica de negócios  
-│   │   ├── entities/        # Classes puras (ex: MediaFile)  
-│   │   ├── repositories/    # Contratos (interfaces)  
-│   │   └── usecases/        # Regras (GetMovies, ScanFolder)  
-│   │  
-│   └── presentation/        # UI e controle  
+│   │   ├── utils/           # Helpers, extensions, formatters
+│   │   ├── models/          # Entidades (Movie, Serie, Folder)
+│   │   └── errors/          # Exceções customizadas
+│   │
+│   └── ui/        # UI e controle  
 │       ├── pages/           # Telas (Home, Details, Settings)  
 │       ├── widgets/         # Componentes reutilizáveis  
 │       ├── providers/       # (ou bloc/cubit) para estado  
