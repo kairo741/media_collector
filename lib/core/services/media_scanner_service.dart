@@ -30,6 +30,76 @@ class MediaScannerService {
     return mediaItems;
   }
 
+  /// Escaneia uma pasta de série e retorna todos os episódios organizados
+  Future<List<MediaItem>> scanSeriesEpisodes(String seriesDirPath, String seriesName) async {
+    final dir = Directory(seriesDirPath);
+    if (!await dir.exists()) return [];
+    
+    final List<MediaItem> episodes = [];
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      if (entity is File) {
+        final ext = path.extension(entity.path).toLowerCase();
+        if (!_videoExtensions.contains(ext)) continue;
+        
+        final fileName = path.basename(entity.path);
+        final fileNameNoExt = path.basenameWithoutExtension(entity.path);
+        final info = _extractEpisodeInfo(fileNameNoExt, entity.path);
+        
+        episodes.add(MediaItem(
+          id: entity.path.hashCode.toString(),
+          title: info.title,
+          filePath: entity.path,
+          fileName: fileName,
+          type: MediaType.series,
+          seriesName: seriesName,
+          seasonNumber: info.seasonNumber,
+          episodeNumber: info.episodeNumber,
+          year: null,
+          quality: null,
+          language: null,
+          lastModified: await entity.lastModified(),
+          fileSize: await entity.length(),
+        ));
+      }
+    }
+    return episodes;
+  }
+
+  /// Extrai informações de temporada e episódio do nome do arquivo
+  _EpisodeInfo _extractEpisodeInfo(String fileName, String filePath) {
+    // Padrões para identificar temporada e episódio
+    final patterns = [
+      RegExp(r'^(.+?)[ ._-]+S(\d{1,2})E(\d{1,2})', caseSensitive: false),
+      RegExp(r'^(.+?)[ ._-]+(\d{1,2})x(\d{1,2})', caseSensitive: false),
+      RegExp(r'^(.+?)[ ._-]+T(\d{1,2})E(\d{1,2})', caseSensitive: false),
+    ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(fileName);
+      if (match != null) {
+        return _EpisodeInfo(
+          title: match.group(1)?.replaceAll('.', ' ')?.trim() ?? fileName,
+          seasonNumber: int.tryParse(match.group(2) ?? ''),
+          episodeNumber: int.tryParse(match.group(3) ?? ''),
+        );
+      }
+    }
+    
+    // Tentar extrair temporada do nome da pasta
+    final parentDir = path.basename(path.dirname(filePath));
+    final seasonMatch = RegExp(r'(?:temporada|season)[ _-]?(\d{1,2})', caseSensitive: false).firstMatch(parentDir);
+    int? season;
+    if (seasonMatch != null) {
+      season = int.tryParse(seasonMatch.group(1)!);
+    }
+    
+    return _EpisodeInfo(
+      title: fileName,
+      seasonNumber: season,
+      episodeNumber: null,
+    );
+  }
+
   Future<void> _scanDirectory(Directory directory, List<MediaItem> mediaItems) async {
     try {
       await for (final FileSystemEntity entity in directory.list(recursive: false)) {
@@ -106,7 +176,7 @@ class MediaScannerService {
     return MediaItem(
       id: _generateId(dir.path),
       title: mediaInfo.title,
-      filePath: contentList.first,
+      filePath: mediaType == MediaType.movie ? contentList.first : dir.path,
       fileName: fileName,
       type: mediaType,
       seriesName: mediaInfo.seriesName,
@@ -180,6 +250,13 @@ class MediaScannerService {
     // Gerar ID único baseado no caminho do arquivo
     return filePath.hashCode.toString();
   }
+}
+
+class _EpisodeInfo {
+  final String title;
+  final int? seasonNumber;
+  final int? episodeNumber;
+  _EpisodeInfo({required this.title, this.seasonNumber, this.episodeNumber});
 }
 
 class MediaInfo {

@@ -73,6 +73,16 @@ class MediaProvider extends ChangeNotifier {
     }
   }
 
+  /// Escaneia episódios de uma série
+  Future<List<MediaItem>> scanSeriesEpisodes(String seriesDirPath, String seriesName) async {
+    try {
+      return await _scannerService.scanSeriesEpisodes(seriesDirPath, seriesName);
+    } catch (e) {
+      _setError('Erro ao escanear episódios: $e');
+      return [];
+    }
+  }
+
   /// Define o filtro de tipo de mídia
   void setFilter(MediaType? filter) {
     _selectedFilter = filter;

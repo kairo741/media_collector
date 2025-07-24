@@ -1,56 +1,84 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:media_collector/core/models/media_item.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
 import 'package:provider/provider.dart';
-import 'ffmpeg_thumb_helper.dart';
-import 'dart:io';
 
-class ShowEpisodesScreen extends StatelessWidget {
+import 'ffmpeg_thumb_helper.dart';
+
+class SeriesEpisodesScreen extends StatelessWidget {
   final String seriesName;
-  const ShowEpisodesScreen({super.key, required this.seriesName});
+
+  const SeriesEpisodesScreen({super.key, required this.seriesName});
 
   @override
   Widget build(BuildContext context) {
-    final episodes = context.read<MediaProvider>().mediaItems
-      .where((item) => item.type == MediaType.series && (item.seriesName ?? item.title) == seriesName)
-      .toList();
-    if (episodes.isEmpty) {
+    final mediaProvider = context.read<MediaProvider>();
+    // Encontrar o MediaItem da série
+    MediaItem? serie;
+    try {
+      serie = mediaProvider.mediaItems.firstWhere(
+        (item) => item.type == MediaType.series && (item.seriesName ?? item.title) == seriesName,
+      );
+    } catch (_) {
+      serie = null;
+    }
+    if (serie == null) {
       return Scaffold(
         appBar: AppBar(title: Text(seriesName)),
-        body: const Center(child: Text('Nenhum episódio encontrado.')),
+        body: const Center(child: Text('Série não encontrada.')),
       );
     }
-    // Agrupar por temporada
-    final Map<int, List<MediaItem>> bySeason = {};
-    for (final ep in episodes) {
-      final season = ep.seasonNumber ?? 1;
-      bySeason.putIfAbsent(season, () => []).add(ep);
-    }
-    return Scaffold(
-      appBar: AppBar(title: Text(seriesName)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: bySeason.entries.map((entry) {
-          final season = entry.key;
-          final eps = entry.value;
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: ExpansionTile(
-              initiallyExpanded: true,
-              title: Text('Temporada $season', style: const TextStyle(fontWeight: FontWeight.bold)),
-              children: [
-                _EpisodesGrid(episodes: eps),
-              ],
-            ),
+    return FutureBuilder<List<MediaItem>>(
+      future: mediaProvider.scanSeriesEpisodes(serie.filePath, seriesName),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(title: Text(seriesName)),
+            body: const Center(child: CircularProgressIndicator()),
           );
-        }).toList(),
-      ),
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: Text(seriesName)),
+            body: const Center(child: Text('Nenhum episódio encontrado.')),
+          );
+        }
+        final episodes = snapshot.data!;
+        // Agrupar por temporada
+        final Map<int, List<MediaItem>> bySeason = {};
+        for (final ep in episodes) {
+          final season = ep.seasonNumber ?? 1;
+          bySeason.putIfAbsent(season, () => []).add(ep);
+        }
+        return Scaffold(
+          appBar: AppBar(title: Text(seriesName)),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: bySeason.entries.map((entry) {
+              final season = entry.key;
+              final eps = entry.value;
+              eps.sort((a, b) => (a.episodeNumber ?? 0).compareTo(b.episodeNumber ?? 0));
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: ExpansionTile(
+                  initiallyExpanded: true,
+                  title: Text('Temporada $season', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  children: [_EpisodesGrid(episodes: eps)],
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 }
 
 class _EpisodesGrid extends StatelessWidget {
   final List<MediaItem> episodes;
+
   const _EpisodesGrid({required this.episodes});
 
   @override
@@ -90,6 +118,7 @@ class _EpisodesGrid extends StatelessWidget {
 
 class _EpisodeCard extends StatelessWidget {
   final MediaItem ep;
+
   const _EpisodeCard({required this.ep});
 
   Future<String?> _getThumbPath() async {
@@ -195,7 +224,10 @@ class _EpisodeCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 100, child: Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(
+            width: 100,
+            child: Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
           Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
         ],
       ),
