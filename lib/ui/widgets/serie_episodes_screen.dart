@@ -5,9 +5,9 @@ import 'package:provider/provider.dart';
 import 'ffmpeg_thumb_helper.dart';
 import 'dart:io';
 
-class SerieEpisodesScreen extends StatelessWidget {
+class ShowEpisodesScreen extends StatelessWidget {
   final String seriesName;
-  const SerieEpisodesScreen({super.key, required this.seriesName});
+  const ShowEpisodesScreen({super.key, required this.seriesName});
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +108,7 @@ class _EpisodeCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AspectRatio(
-              aspectRatio: 21.6 / 9,
+              aspectRatio: 26 / 9,
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
                 child: FutureBuilder<String?>(

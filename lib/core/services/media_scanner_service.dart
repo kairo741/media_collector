@@ -1,10 +1,21 @@
 import 'dart:io';
+import 'dart:math';
+
 import 'package:path/path.dart' as path;
+
 import '../models/media_item.dart';
 
 class MediaScannerService {
   static const List<String> _videoExtensions = [
-    '.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.3gp'
+    '.mp4',
+    '.avi',
+    '.mkv',
+    '.mov',
+    '.wmv',
+    '.flv',
+    '.webm',
+    '.m4v',
+    '.3gp',
   ];
 
   Future<List<MediaItem>> scanDirectory(String directoryPath) async {
@@ -15,20 +26,25 @@ class MediaScannerService {
       throw Exception('Diretório não encontrado: $directoryPath');
     }
 
-    await _scanDirectoryRecursively(directory, mediaItems);
+    await _scanDirectory(directory, mediaItems);
     return mediaItems;
   }
 
-  Future<void> _scanDirectoryRecursively(Directory directory, List<MediaItem> mediaItems) async {
+  Future<void> _scanDirectory(Directory directory, List<MediaItem> mediaItems) async {
     try {
       await for (final FileSystemEntity entity in directory.list(recursive: false)) {
         if (entity is File) {
           final MediaItem? mediaItem = _processFile(entity);
           if (mediaItem != null) {
+            print("Media: ${mediaItem.displayTitle}");
             mediaItems.add(mediaItem);
           }
         } else if (entity is Directory) {
-          await _scanDirectoryRecursively(entity, mediaItems);
+          final MediaItem? mediaItem = await _processSubDirs(entity, mediaItems);
+          if (mediaItem != null) {
+            print("Dir: ${mediaItem.displayTitle}");
+            mediaItems.add(mediaItem);
+          }
         }
       }
     } catch (e) {
@@ -38,17 +54,17 @@ class MediaScannerService {
 
   MediaItem? _processFile(File file) {
     final String extension = path.extension(file.path).toLowerCase();
-    
+
     if (!_videoExtensions.contains(extension)) {
       return null;
     }
 
     final String fileName = path.basename(file.path);
     final String fileNameWithoutExtension = path.basenameWithoutExtension(file.path);
-    
+
     // Tentar extrair informações do nome do arquivo
-    final MediaInfo mediaInfo = _extractMediaInfo(fileNameWithoutExtension);
-    
+    final MediaInfo mediaInfo = _extractMediaInfo(fileNameWithoutExtension, MediaType.movie);
+
     return MediaItem(
       id: _generateId(file.path),
       title: mediaInfo.title,
@@ -66,7 +82,57 @@ class MediaScannerService {
     );
   }
 
-  MediaInfo _extractMediaInfo(String fileName) {
+  Future<MediaItem?> _processSubDirs(Directory dir, List<MediaItem> mediaItems) async {
+    final String fileName = path.basename(dir.path);
+    var contentList = <String>[];
+    await _hasMediaContent(dir, contentList);
+
+    if (contentList.isEmpty) return null;
+
+    final mediaType = contentList.length > 1 ? MediaType.series : MediaType.movie;
+
+    // Tentar extrair informações do nome do arquivo
+    final MediaInfo mediaInfo = MediaInfo(
+      title: fileName.replaceAll(".", " "),
+      type: MediaType.series,
+      seriesName: fileName,
+      seasonNumber: 1,
+      episodeNumber: 1,
+      quality: "match.group(4)",
+      language: "match.group(5)",
+    );
+    Random random = new Random();
+    int randomNumber = random.nextInt(100);
+    return MediaItem(
+      id: _generateId(dir.path),
+      title: mediaInfo.title,
+      filePath: contentList.first,
+      fileName: fileName,
+      type: mediaType,
+      seriesName: mediaInfo.seriesName,
+      seasonNumber: mediaInfo.seasonNumber,
+      episodeNumber: mediaInfo.episodeNumber,
+      year: mediaInfo.year,
+      quality: mediaInfo.quality,
+      language: mediaInfo.language,
+      lastModified: DateTime.now(),
+      fileSize: 10,
+      posterUrl: "https://picsum.photos/200/300?random=${randomNumber}",
+    );
+  }
+
+  Future<void> _hasMediaContent(Directory directory, List<String> contentList) async {
+    await for (final FileSystemEntity entity in directory.list(recursive: true)) {
+      if (entity is File) {
+        final MediaItem? mediaItem = _processFile(entity);
+        if (mediaItem != null) {
+          contentList.add(entity.path);
+        }
+      }
+    }
+  }
+
+  MediaInfo _extractMediaInfo(String fileName, MediaType type) {
     // Padrões comuns para nomes de arquivos de mídia
     final patterns = [
       // Série: Nome.S01E02.Qualidade.Idioma
@@ -85,8 +151,8 @@ class MediaScannerService {
         if (match.groupCount >= 3 && match.group(2)!.length <= 2) {
           // Padrão de série
           return MediaInfo(
-            title: match.group(1)!.trim(),
-            type: MediaType.series,
+            title: match.group(1)!.trim().replaceAll(".", " "),
+            type: type,
             seriesName: match.group(1)!.trim(),
             seasonNumber: int.tryParse(match.group(2)!),
             episodeNumber: int.tryParse(match.group(3)!),
@@ -96,8 +162,8 @@ class MediaScannerService {
         } else if (match.groupCount >= 2) {
           // Padrão de filme
           return MediaInfo(
-            title: match.group(1)!.trim(),
-            type: MediaType.movie,
+            title: match.group(1)!.trim().replaceAll(".", " "),
+            type: type,
             year: match.group(2),
             quality: match.group(3),
             language: match.group(4),
@@ -107,10 +173,7 @@ class MediaScannerService {
     }
 
     // Fallback: tratar como filme com nome simples
-    return MediaInfo(
-      title: fileName.trim(),
-      type: MediaType.movie,
-    );
+    return MediaInfo(title: fileName.trim(), type: type);
   }
 
   String _generateId(String filePath) {
@@ -139,4 +202,4 @@ class MediaInfo {
     this.quality,
     this.language,
   });
-} 
+}

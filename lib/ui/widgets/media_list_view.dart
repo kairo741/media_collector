@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:media_collector/core/models/media_item.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
-import 'package:provider/provider.dart';
 import 'package:media_collector/ui/widgets/serie_episodes_screen.dart';
+import 'package:provider/provider.dart';
 
 import 'media_item_card.dart';
 
@@ -271,7 +271,7 @@ class _MediaPosterCard extends StatelessWidget {
         if (!isMovie) {
           Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => SerieEpisodesScreen(seriesName: item.seriesName ?? item.title)));
+          ).push(MaterialPageRoute(builder: (_) => ShowEpisodesScreen(seriesName: item.seriesName ?? item.title)));
         } else {
           context.read<MediaProvider>().openMediaFile(item);
         }
