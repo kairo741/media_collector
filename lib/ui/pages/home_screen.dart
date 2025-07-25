@@ -1,43 +1,18 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
+import 'package:media_collector/ui/widgets/media_list_view.dart';
 import 'package:provider/provider.dart';
+
 import '../widgets/directory_selector.dart';
-import '../widgets/media_list_view.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.video_library, color: Colors.white),
-            SizedBox(width: 8),
-            Text('Media Collector'),
-          ],
-        ),
-        backgroundColor: colorScheme.secondaryContainer,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        actions: [
-          Consumer<MediaProvider>(
-            builder: (context, mediaProvider, child) {
-              if (mediaProvider.errorMessage != null) {
-                return IconButton(
-                  icon: const Icon(Icons.error, color: Colors.orange),
-                  onPressed: () => _showErrorSnackBar(context, mediaProvider.errorMessage!),
-                  tooltip: 'Ver erro',
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
-      ),
+      appBar: _buildAppBar(context),
       body: SafeArea(
         child: Consumer<MediaProvider>(
           builder: (context, mediaProvider, child) {
@@ -46,6 +21,7 @@ class HomeScreen extends StatelessWidget {
               return SingleChildScrollView(
                 child: Column(
                   children: [
+                    _buildProgressIndicator(mediaProvider),
                     const DirectorySelector(),
                     if (mediaProvider.errorMessage != null) _buildErrorBanner(context, mediaProvider.errorMessage!),
                     _buildWelcomeScreen(context),
@@ -53,10 +29,9 @@ class HomeScreen extends StatelessWidget {
                 ),
               );
             } else {
-              // Listagem ocupa espaço normalmente
               return Column(
                 children: [
-                  const DirectorySelector(),
+                  _buildProgressIndicator(mediaProvider),
                   if (mediaProvider.errorMessage != null) _buildErrorBanner(context, mediaProvider.errorMessage!),
                   Expanded(child: const MediaListView()),
                 ],
@@ -101,7 +76,7 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 32),
             Card(
               elevation: 2,
-              child:Padding(
+              child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
@@ -198,6 +173,169 @@ class HomeScreen extends StatelessWidget {
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildProgressIndicator(MediaProvider provider) {
+    return LinearProgressIndicator(value: provider.isScanning ? null : 0, backgroundColor: Colors.transparent);
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext ctx) {
+    final colorScheme = Theme.of(ctx).colorScheme;
+    const iconButtonSize = 18.0;
+    return AppBar(
+      actionsPadding: EdgeInsets.only(right: 10),
+      title: const Row(
+        children: [
+          Icon(Icons.video_library, color: Colors.white),
+          SizedBox(width: 8),
+          Text('Media Collector'),
+        ],
+      ),
+      backgroundColor: colorScheme.secondaryContainer,
+      foregroundColor: Colors.white,
+      elevation: 2,
+      actions: [
+        Consumer<MediaProvider>(
+          builder: (context, mediaProvider, child) {
+            if (mediaProvider.selectedDirectory.isNotEmpty) {
+              return Row(
+                children: [
+                  if (mediaProvider.totalItems > 0) ...[
+                    _buildStatistics(mediaProvider),
+                    const SizedBox(width: 10),
+                    const VerticalDivider(width: 20, thickness: 1, indent: 20, endIndent: 20, color: Colors.grey),
+                    const SizedBox(width: 10),
+                  ],
+                  FilledButton.icon(
+                    label: Text(mediaProvider.selectedDirectory, style: TextStyle(color: colorScheme.primary)),
+                    icon: Icon(Icons.folder, color: colorScheme.primary, size: 24),
+                    onPressed: mediaProvider.isScanning ? null : () => _selectDirectory(context),
+                    style: FilledButton.styleFrom(backgroundColor: colorScheme.secondary.withAlpha(40)),
+                  ),
+                  const SizedBox(width: 5),
+                  IconButton(
+                    icon: Icon(Icons.clear, color: Colors.red, size: iconButtonSize),
+                    onPressed: mediaProvider.isScanning ? null : () => _clearData(context),
+                    tooltip: 'Limpar',
+                    style: IconButton.styleFrom(backgroundColor: colorScheme.secondary.withAlpha(40)),
+                    constraints: const BoxConstraints(minWidth: iconButtonSize, minHeight: iconButtonSize),
+                    hoverColor: Colors.red.withAlpha(40),
+                  ),
+                  const SizedBox(width: 5),
+                  IconButton(
+                    icon: Icon(Icons.refresh, color: colorScheme.primary, size: iconButtonSize),
+                    onPressed: mediaProvider.isScanning ? null : () => _rescanDirectory(context),
+                    tooltip: 'Reescanear',
+                    style: IconButton.styleFrom(backgroundColor: colorScheme.secondary.withAlpha(40)),
+                    constraints: const BoxConstraints(minWidth: iconButtonSize, minHeight: iconButtonSize),
+                  ),
+                  const SizedBox(width: 10),
+                  if (mediaProvider.errorMessage != null) ...[
+                    const VerticalDivider(width: 20, thickness: 1, indent: 20, endIndent: 20, color: Colors.grey),
+                    IconButton(
+                      icon: const Icon(Icons.error, color: Colors.orange),
+                      onPressed: () => _showErrorSnackBar(context, mediaProvider.errorMessage!),
+                      tooltip: 'Ver erro',
+                    ),
+                  ],
+                ],
+              );
+            }
+
+            return const SizedBox.shrink();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatistics(MediaProvider mediaProvider) {
+    return Row(
+      children: [
+        _buildStatChip('Total: ${mediaProvider.totalItems}', Icons.video_library, Colors.grey),
+        const SizedBox(width: 8),
+        _buildStatChip('Filmes: ${mediaProvider.movieCount}', Icons.movie, Colors.blue),
+        const SizedBox(width: 8),
+        _buildStatChip('Séries: ${mediaProvider.seriesCount}', Icons.tv, Colors.green),
+      ],
+    );
+  }
+
+  Widget _buildStatChip(String label, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectDirectory(BuildContext context) async {
+    try {
+      String? selectedDirectory = await FilePicker.platform.getDirectoryPath(dialogTitle: 'Selecione a pasta de mídia');
+
+      if (selectedDirectory != null) {
+        await context.read<MediaProvider>().scanDirectory(selectedDirectory);
+      }
+    } catch (e) {
+      _showErrorDialog(context, 'Erro ao selecionar pasta: $e');
+    }
+  }
+
+  Future<void> _rescanDirectory(BuildContext context) async {
+    try {
+      final mediaProvider = context.read<MediaProvider>();
+      await mediaProvider.scanDirectory(mediaProvider.selectedDirectory);
+    } catch (e) {
+      _showErrorDialog(context, 'Erro ao reescanear pasta: $e');
+    }
+  }
+
+  void _clearData(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Limpar Dados'),
+        content: const Text(
+          'Tem certeza que deseja limpar todos os dados escaneados? Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              context.read<MediaProvider>().clearData();
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Limpar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Erro'),
+        content: Text(message),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
       ),
     );
   }
