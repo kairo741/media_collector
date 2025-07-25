@@ -17,17 +17,26 @@ class MediaProvider extends ChangeNotifier {
 
   // Getters
   List<MediaItem> get mediaItems => _mediaItems;
+
   List<MediaItem> get filteredItems => _filteredItems;
+
   String get selectedDirectory => _selectedDirectory;
+
   bool get isScanning => _isScanning;
+
   String? get errorMessage => _errorMessage;
+
   MediaType? get selectedFilter => _selectedFilter;
+
   String get searchQuery => _searchQuery;
 
   // Estatísticas
   int get totalItems => _mediaItems.length;
+
   int get movieCount => _mediaItems.where((item) => item.type == MediaType.movie).length;
+
   int get seriesCount => _mediaItems.where((item) => item.type == MediaType.series).length;
+
   int get totalSize {
     return _mediaItems.fold(0, (sum, item) => sum + item.fileSize);
   }
@@ -109,10 +118,10 @@ class MediaProvider extends ChangeNotifier {
       if (_searchQuery.isNotEmpty) {
         final searchLower = _searchQuery.toLowerCase();
         return item.title.toLowerCase().contains(searchLower) ||
-               item.fileName.toLowerCase().contains(searchLower) ||
-               (item.seriesName?.toLowerCase().contains(searchLower) ?? false) ||
-               (item.year?.contains(searchLower) ?? false) ||
-               (item.quality?.toLowerCase().contains(searchLower) ?? false);
+            item.fileName.toLowerCase().contains(searchLower) ||
+            (item.seriesName?.toLowerCase().contains(searchLower) ?? false) ||
+            (item.year?.contains(searchLower) ?? false) ||
+            (item.quality?.toLowerCase().contains(searchLower) ?? false);
       }
 
       return true;
@@ -136,7 +145,7 @@ class MediaProvider extends ChangeNotifier {
   /// Obtém itens agrupados por série
   Map<String, List<MediaItem>> getSeriesGrouped() {
     final Map<String, List<MediaItem>> grouped = {};
-    
+
     for (final item in _filteredItems.where((item) => item.type == MediaType.series)) {
       final seriesName = item.seriesName ?? 'Série Desconhecida';
       grouped.putIfAbsent(seriesName, () => []).add(item);
@@ -171,4 +180,4 @@ class MediaProvider extends ChangeNotifier {
   void _clearError() {
     _errorMessage = null;
   }
-} 
+}

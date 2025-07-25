@@ -27,21 +27,31 @@ class MediaPlayerService {
   }
 
   /// Abre a pasta contendo o arquivo no explorador de arquivos
-  Future<bool> openContainingFolder(String filePath) async {
+  Future<bool> openContainingFolder(String path) async {
     try {
-      final file = File(filePath);
-      
-      if (!await file.exists()) {
-        throw Exception('Arquivo não encontrado: $filePath');
+      final file = File(path);
+      final directory = Directory(path);
+      bool isFile = await file.exists();
+      bool isDir = await directory.exists();
+      String folderToOpen;
+      if (isFile) {
+        folderToOpen = file.parent.path;
+      } else if (isDir) {
+        folderToOpen = directory.path;
+      } else {
+        throw Exception('Arquivo ou pasta não encontrado: $path');
       }
 
-      final directory = file.parent.path;
-
       if (Platform.isWindows) {
-        final result = await Process.run('explorer', ['/select,', filePath], runInShell: true);
-        return result.exitCode == 0;
+        if (isFile) {
+          await Process.run('explorer', ['/select,', path], runInShell: true);
+          return true;
+        } else {
+          await Process.run('explorer', [folderToOpen], runInShell: true);
+          return true;
+        }
       } else {
-        final uri = Uri.file(directory);
+        final uri = Uri.file(folderToOpen);
         return await launchUrl(uri);
       }
     } catch (e) {

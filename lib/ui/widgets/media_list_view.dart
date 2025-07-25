@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:media_collector/core/models/media_item.dart';
+import 'package:media_collector/core/utils/string_extensions.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
 import 'package:media_collector/ui/widgets/series_episodes_screen.dart';
 import 'package:provider/provider.dart';
@@ -14,18 +17,15 @@ class MediaListView extends StatefulWidget {
 }
 
 class _MediaListViewState extends State<MediaListView> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -35,11 +35,12 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
     return Consumer<MediaProvider>(
       builder: (context, mediaProvider, child) {
         return Column(
+          mainAxisSize: MainAxisSize.max,
           children: [
+            const SizedBox(height: 10),
             _buildSearchAndFilters(context, mediaProvider),
-            // const SizedBox(height: 16),
-            // _buildTabBar(),
-            Expanded(child: _buildTabBarView(context, mediaProvider)),
+            const SizedBox(height: 10),
+            Flexible(child: _buildMediaList(context, mediaProvider.filteredItems)),
           ],
         );
       },
@@ -119,35 +120,6 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
       onSelected: (_) => onTap(),
       selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
       checkmarkColor: Theme.of(context).primaryColor,
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
-      child: TabBar(
-        controller: _tabController,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.grey[600],
-        indicator: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(8)),
-        tabs: const [
-          Tab(text: 'Todos'),
-          Tab(text: 'Filmes'),
-          Tab(text: 'Séries'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabBarView(BuildContext context, MediaProvider mediaProvider) {
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _buildMediaList(context, mediaProvider.filteredItems),
-        _buildMediaList(context, mediaProvider.movies),
-        _buildSeriesView(context, mediaProvider),
-      ],
     );
   }
 
@@ -279,31 +251,34 @@ class _MediaPosterCard extends StatelessWidget {
       child: Card(
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: SizedBox(
-          height: 290, // Altura fixa para evitar overflow
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Imagem do pôster com proporção 2:3
-              AspectRatio(
-                aspectRatio: 2.7 / 3,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: _buildPosterImage(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                child: _buildPosterImage(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: SizedBox(
+                height: 25,
+                child: Center(
+                  child: Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Text(
-                  item.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ),
-              // Footer com botões
-              Padding(
+            ),
+            SizedBox(
+              height: 48, // altura fixa para o footer
+              child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -326,8 +301,8 @@ class _MediaPosterCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -335,16 +310,26 @@ class _MediaPosterCard extends StatelessWidget {
 
   Widget _buildPosterImage() {
     if (item.posterUrl != null && item.posterUrl!.isNotEmpty) {
-      return Image.network(
-        item.posterUrl!,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        errorBuilder: (context, error, stackTrace) => _placeholder(),
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return const Center(child: CircularProgressIndicator());
-        },
-      );
+      final url = item.posterUrl!;
+      if (url.isUrl) {
+        return Image.network(
+          url,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          errorBuilder: (context, error, stackTrace) => _placeholder(),
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return const Center(child: CircularProgressIndicator());
+          },
+        );
+      } else {
+        return Image.file(
+          File(url),
+          fit: BoxFit.cover,
+          width: double.infinity,
+          errorBuilder: (context, error, stackTrace) => _placeholder(),
+        );
+      }
     }
     return _placeholder();
   }

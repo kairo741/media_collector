@@ -18,6 +18,8 @@ class MediaScannerService {
     '.3gp',
   ];
 
+  static const List<String> _imageExtensions = ['.png', '.jpg', '.webp'];
+
   Future<List<MediaItem>> scanDirectory(String directoryPath) async {
     final List<MediaItem> mediaItems = [];
     final Directory directory = Directory(directoryPath);
@@ -34,32 +36,34 @@ class MediaScannerService {
   Future<List<MediaItem>> scanSeriesEpisodes(String seriesDirPath, String seriesName) async {
     final dir = Directory(seriesDirPath);
     if (!await dir.exists()) return [];
-    
+
     final List<MediaItem> episodes = [];
     await for (final entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is File) {
         final ext = path.extension(entity.path).toLowerCase();
         if (!_videoExtensions.contains(ext)) continue;
-        
+
         final fileName = path.basename(entity.path);
         final fileNameNoExt = path.basenameWithoutExtension(entity.path);
         final info = _extractEpisodeInfo(fileNameNoExt, entity.path);
-        
-        episodes.add(MediaItem(
-          id: entity.path.hashCode.toString(),
-          title: info.title,
-          filePath: entity.path,
-          fileName: fileName,
-          type: MediaType.series,
-          seriesName: seriesName,
-          seasonNumber: info.seasonNumber,
-          episodeNumber: info.episodeNumber,
-          year: null,
-          quality: null,
-          language: null,
-          lastModified: await entity.lastModified(),
-          fileSize: await entity.length(),
-        ));
+
+        episodes.add(
+          MediaItem(
+            id: entity.path.hashCode.toString(),
+            title: info.title,
+            filePath: entity.path,
+            fileName: fileName,
+            type: MediaType.series,
+            seriesName: seriesName,
+            seasonNumber: info.seasonNumber,
+            episodeNumber: info.episodeNumber,
+            year: null,
+            quality: null,
+            language: null,
+            lastModified: await entity.lastModified(),
+            fileSize: await entity.length(),
+          ),
+        );
       }
     }
     return episodes;
@@ -84,7 +88,7 @@ class MediaScannerService {
         );
       }
     }
-    
+
     // Tentar extrair temporada do nome da pasta
     final parentDir = path.basename(path.dirname(filePath));
     final seasonMatch = RegExp(r'(?:temporada|season)[ _-]?(\d{1,2})', caseSensitive: false).firstMatch(parentDir);
@@ -92,12 +96,8 @@ class MediaScannerService {
     if (seasonMatch != null) {
       season = int.tryParse(seasonMatch.group(1)!);
     }
-    
-    return _EpisodeInfo(
-      title: fileName,
-      seasonNumber: season,
-      episodeNumber: null,
-    );
+
+    return _EpisodeInfo(title: fileName, seasonNumber: season, episodeNumber: null);
   }
 
   Future<void> _scanDirectory(Directory directory, List<MediaItem> mediaItems) async {
@@ -155,7 +155,8 @@ class MediaScannerService {
   Future<MediaItem?> _processSubDirs(Directory dir, List<MediaItem> mediaItems) async {
     final String fileName = path.basename(dir.path);
     var contentList = <String>[];
-    await _hasMediaContent(dir, contentList);
+    var localPosterPath = <String>[''];
+    await _hasMediaContent(dir, contentList, localPosterPath);
 
     if (contentList.isEmpty) return null;
 
@@ -169,8 +170,10 @@ class MediaScannerService {
       seasonNumber: 1,
       episodeNumber: 1,
       quality: "match.group(4)",
-      language: "match.group(5)",
+      // TODO
+      language: "match.group(5)", // TODO
     );
+
     Random random = new Random();
     int randomNumber = random.nextInt(100);
     return MediaItem(
@@ -187,13 +190,20 @@ class MediaScannerService {
       language: mediaInfo.language,
       lastModified: DateTime.now(),
       fileSize: 10,
-      posterUrl: "https://picsum.photos/200/300?random=${randomNumber}",
+      posterUrl: localPosterPath[0].isEmpty
+          ? "https://picsum.photos/200/300?random=${randomNumber}"
+          : localPosterPath[0],
     );
   }
 
-  Future<void> _hasMediaContent(Directory directory, List<String> contentList) async {
+  Future<void> _hasMediaContent(Directory directory, List<String> contentList, List<String> localPosterPath) async {
     await for (final FileSystemEntity entity in directory.list(recursive: true)) {
       if (entity is File) {
+        final String extension = path.extension(entity.path).toLowerCase();
+        if (localPosterPath[0].isEmpty && _imageExtensions.contains(extension)) {
+          localPosterPath[0] = entity.path;
+        }
+
         final MediaItem? mediaItem = _processFile(entity);
         if (mediaItem != null) {
           contentList.add(entity.path);
@@ -256,6 +266,7 @@ class _EpisodeInfo {
   final String title;
   final int? seasonNumber;
   final int? episodeNumber;
+
   _EpisodeInfo({required this.title, this.seasonNumber, this.episodeNumber});
 }
 
