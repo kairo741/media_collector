@@ -128,7 +128,7 @@ class MediaProvider extends ChangeNotifier {
     }).toList();
 
     // Ordenar por nome
-    _filteredItems.sort((a, b) => a.displayTitle.compareTo(b.displayTitle));
+    _filteredItems.sort((a, b) => a.title.compareTo(b.title));
   }
 
   /// Limpa todos os dados
@@ -155,7 +155,7 @@ class MediaProvider extends ChangeNotifier {
     for (final series in grouped.values) {
       series.sort((a, b) {
         if (a.seasonNumber != b.seasonNumber) {
-          return (a.seasonNumber ?? 0).compareTo(b.seasonNumber ?? 0);
+          return (a.seasonNumber ?? '').compareTo(b.seasonNumber ?? '');
         }
         return (a.episodeNumber ?? 0).compareTo(b.episodeNumber ?? 0);
       });

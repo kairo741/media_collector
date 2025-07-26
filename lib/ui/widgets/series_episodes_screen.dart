@@ -47,23 +47,25 @@ class SeriesEpisodesScreen extends StatelessWidget {
         }
         final episodes = snapshot.data!;
         // Agrupar por temporada
-        final Map<int, List<MediaItem>> bySeason = {};
+        final Map<String, List<MediaItem>> bySeason = {};
         for (final ep in episodes) {
-          final season = ep.seasonNumber ?? 1;
+          final season = ep.seasonNumber ?? '1';
           bySeason.putIfAbsent(season, () => []).add(ep);
         }
         return Scaffold(
           appBar: AppBar(title: Text(seriesName)),
           body: ListView(
             padding: const EdgeInsets.all(16),
-            children: bySeason.entries.map((entry) {
-              final season = entry.key;
-              final eps = entry.value;
+            children: bySeason.entries.toList().asMap().entries.map((entry) {
+              final index = entry.key;
+              final seasonEntry = entry.value;
+              final season = seasonEntry.key;
+              final eps = seasonEntry.value;
               eps.sort((a, b) => (a.episodeNumber ?? 0).compareTo(b.episodeNumber ?? 0));
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
                 child: ExpansionTile(
-                  initiallyExpanded: true,
+                  initiallyExpanded: index == 0, // Apenas a primeira temporada expandida
                   title: Text('Temporada $season', style: const TextStyle(fontWeight: FontWeight.bold)),
                   children: [_EpisodesGrid(episodes: eps)],
                 ),
@@ -160,7 +162,7 @@ class _EpisodeCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               child: Text(
-                ep.displayTitle,
+                "${ep.episodeNumber != null ? '${ep.episodeNumber} | ' : ''}${ep.title}",
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -195,7 +197,7 @@ class _EpisodeCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(ep.displayTitle),
+        title: Text(ep.title),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

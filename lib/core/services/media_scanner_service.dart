@@ -71,33 +71,67 @@ class MediaScannerService {
 
   /// Extrai informações de temporada e episódio do nome do arquivo
   _EpisodeInfo _extractEpisodeInfo(String fileName, String filePath) {
+    // Obter o nome da pasta pai para usar como temporada
+    final parentDir = path.basename(path.dirname(filePath));
+
     // Padrões para identificar temporada e episódio
     final patterns = [
-      RegExp(r'^(.+?)[ ._-]+S(\d{1,2})E(\d{1,2})', caseSensitive: false),
+      // S1E01 - O Garoto No Iceberg.mkv
+      RegExp(r'^(.+?)[ ._-]*S(\d{1,2})E(\d{1,2})[ ._-]*(.+)?$', caseSensitive: false),
+      // 01 Bem-Vindo a Cidade da República 02 Uma Folha no Vento.mkv
+      RegExp(r'^(\d{1,2})[ ._-]+(.+?)[ ._-]+(\d{1,2})[ ._-]+(.+)$', caseSensitive: false),
+      // iCarly.S01E01.1080p.Dual.mkv
+      RegExp(r'^(.+?)\.S(\d{1,2})E(\d{1,2})\.(.+)$', caseSensitive: false),
+      // A.Concierge.Pokemon.S01E02.1080p.WEB-DL.DUAL.5.1.mkv
+      RegExp(r'^(.+?)\.S(\d{1,2})E(\d{1,2})\.(.+)$', caseSensitive: false),
+      // Padrões alternativos
       RegExp(r'^(.+?)[ ._-]+(\d{1,2})x(\d{1,2})', caseSensitive: false),
       RegExp(r'^(.+?)[ ._-]+T(\d{1,2})E(\d{1,2})', caseSensitive: false),
+      // Padrão para apenas número do episódio no início
+      RegExp(r'^(\d{1,2})[ ._-]+(.+)$', caseSensitive: false),
     ];
 
-    for (final pattern in patterns) {
+    for (int i = 0; i < patterns.length; i++) {
+      final pattern = patterns[i];
       final match = pattern.firstMatch(fileName);
       if (match != null) {
-        return _EpisodeInfo(
-          title: match.group(1)?.replaceAll('.', ' ').trim() ?? fileName,
-          seasonNumber: int.tryParse(match.group(2) ?? ''),
-          episodeNumber: int.tryParse(match.group(3) ?? ''),
-        );
+        String title;
+        int? episodeNumber;
+
+        switch (i) { // TODO - Melhorar com mais casos de matches (pensar em um json ou dados em banco)
+          case 0: // S1E01 - O Garoto No Iceberg.mkv
+            title = match.group(1)?.replaceAll('.', ' ').trim() ?? fileName;
+            episodeNumber = int.tryParse(match.group(3) ?? '');
+            break;
+          case 1: // 01 Bem-Vindo a Cidade da República 02 Uma Folha no Vento.mkv
+            title = '${match.group(2)?.trim()} ${match.group(4)?.trim()}'.trim();
+            episodeNumber = int.tryParse(match.group(1) ?? '');
+            break;
+          case 2: // iCarly.S01E01.1080p.Dual.mkv
+          case 3: // A.Concierge.Pokemon.S01E02.1080p.WEB-DL.DUAL.5.1.mkv
+            title = match.group(1)?.replaceAll('.', ' ').trim() ?? fileName;
+            episodeNumber = int.tryParse(match.group(3) ?? '');
+            break;
+          case 4: // Padrão 1x02
+          case 5: // Padrão T01E02
+            title = match.group(1)?.replaceAll('.', ' ').trim() ?? fileName;
+            episodeNumber = int.tryParse(match.group(3) ?? '');
+            break;
+          case 6: // Apenas número do episódio no início
+            title = match.group(2)?.trim() ?? fileName;
+            episodeNumber = int.tryParse(match.group(1) ?? '');
+            break;
+          default:
+            title = fileName;
+            episodeNumber = null;
+        }
+
+        return _EpisodeInfo(title: title, seasonNumber: parentDir, episodeNumber: episodeNumber);
       }
     }
 
-    // Tentar extrair temporada do nome da pasta
-    final parentDir = path.basename(path.dirname(filePath));
-    final seasonMatch = RegExp(r'(?:temporada|season)[ _-]?(\d{1,2})', caseSensitive: false).firstMatch(parentDir);
-    int? season;
-    if (seasonMatch != null) {
-      season = int.tryParse(seasonMatch.group(1)!);
-    }
-
-    return _EpisodeInfo(title: fileName, seasonNumber: season, episodeNumber: null);
+    // Fallback: usar nome da pasta pai como temporada e filename como título
+    return _EpisodeInfo(title: fileName, seasonNumber: parentDir, episodeNumber: null);
   }
 
   Future<void> _scanDirectory(Directory directory, List<MediaItem> mediaItems) async {
@@ -106,13 +140,13 @@ class MediaScannerService {
         if (entity is File) {
           final MediaItem? mediaItem = _processFile(entity);
           if (mediaItem != null) {
-            print("Media: ${mediaItem.displayTitle}");
+            print("Media: ${mediaItem.title}");
             mediaItems.add(mediaItem);
           }
         } else if (entity is Directory) {
           final MediaItem? mediaItem = await _processSubDirs(entity, mediaItems);
           if (mediaItem != null) {
-            print("Dir: ${mediaItem.displayTitle}");
+            print("Dir: ${mediaItem.title}");
             mediaItems.add(mediaItem);
           }
         }
@@ -167,7 +201,7 @@ class MediaScannerService {
       title: fileName.replaceAll(".", " "),
       type: MediaType.series,
       seriesName: fileName,
-      seasonNumber: 1,
+      seasonNumber: "1",
       episodeNumber: 1,
       quality: "match.group(4)",
       // TODO
@@ -234,7 +268,7 @@ class MediaScannerService {
             title: match.group(1)!.trim().replaceAll(".", " "),
             type: type,
             seriesName: match.group(1)!.trim(),
-            seasonNumber: int.tryParse(match.group(2)!),
+            seasonNumber: match.group(2),
             episodeNumber: int.tryParse(match.group(3)!),
             quality: match.group(4),
             language: match.group(5),
@@ -264,7 +298,7 @@ class MediaScannerService {
 
 class _EpisodeInfo {
   final String title;
-  final int? seasonNumber;
+  final String? seasonNumber;
   final int? episodeNumber;
 
   _EpisodeInfo({required this.title, this.seasonNumber, this.episodeNumber});
@@ -274,7 +308,7 @@ class MediaInfo {
   final String title;
   final MediaType type;
   final String? seriesName;
-  final int? seasonNumber;
+  final String? seasonNumber;
   final int? episodeNumber;
   final String? year;
   final String? quality;

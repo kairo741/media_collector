@@ -5,7 +5,7 @@ class MediaItem {
   final String fileName;
   final MediaType type;
   final String? seriesName;
-  final int? seasonNumber;
+  final String? seasonNumber;
   final int? episodeNumber;
   final String? year;
   final String? quality;
@@ -67,13 +67,6 @@ class MediaItem {
       'fileSize': fileSize,
       'posterUrl': posterUrl,
     };
-  }
-
-  String get displayTitle {
-    if (type == MediaType.series) {
-      return '${seriesName ?? title} S${seasonNumber?.toString().padLeft(2, '0') ?? '??'}E${episodeNumber?.toString().padLeft(2, '0') ?? '??'}';
-    }
-    return title;
   }
 
   String get fileSizeFormatted {
