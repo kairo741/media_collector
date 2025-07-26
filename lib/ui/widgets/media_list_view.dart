@@ -114,12 +114,13 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
   }
 
   Widget _buildFilterChip(BuildContext context, String label, MediaType? filter, bool isSelected, VoidCallback onTap) {
+    final colorScheme = Theme.of(context).colorScheme;
     return FilterChip(
       label: Text(label),
       selected: isSelected,
       onSelected: (_) => onTap(),
-      selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
-      checkmarkColor: Theme.of(context).primaryColor,
+      selectedColor: colorScheme.primary.withOpacity(0.2),
+      checkmarkColor: colorScheme.secondary,
     );
   }
 
@@ -236,6 +237,7 @@ class _MediaPosterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isMovie = !(item.type == MediaType.series);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
@@ -290,7 +292,12 @@ class _MediaPosterCard extends StatelessWidget {
                         context.read<MediaProvider>().openContainingFolder(item);
                       },
                     ),
-                    Chip(label: Text(isMovie ? "Filme" : "Série")),
+                    Chip(
+                      label: Text(isMovie ? "Filme" : "Série"),
+                      backgroundColor: isMovie
+                          ? colorScheme.primaryContainer.withAlpha(100)
+                          : colorScheme.tertiaryContainer.withAlpha(100),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.info_outline, size: 20),
                       tooltip: 'Informações',
