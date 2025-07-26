@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 
 import 'package:path/path.dart' as path;
 
@@ -98,7 +97,8 @@ class MediaScannerService {
         String title;
         int? episodeNumber;
 
-        switch (i) { // TODO - Melhorar com mais casos de matches (pensar em um json ou dados em banco)
+        switch (i) {
+          // TODO - Melhorar com mais casos de matches (pensar em um json ou dados em banco)
           case 0: // S1E01 - O Garoto No Iceberg.mkv
             title = match.group(1)?.replaceAll('.', ' ').trim() ?? fileName;
             episodeNumber = int.tryParse(match.group(3) ?? '');
@@ -183,6 +183,7 @@ class MediaScannerService {
       language: mediaInfo.language,
       lastModified: file.lastModifiedSync(),
       fileSize: file.lengthSync(),
+      posterUrl: "https://picsum.photos/seed/$fileName/800/1200", // TODO - Remover implementação temporária
     );
   }
 
@@ -208,8 +209,6 @@ class MediaScannerService {
       language: "match.group(5)", // TODO
     );
 
-    Random random = new Random();
-    int randomNumber = random.nextInt(100);
     return MediaItem(
       id: _generateId(dir.path),
       title: mediaInfo.title,
@@ -225,7 +224,7 @@ class MediaScannerService {
       lastModified: DateTime.now(),
       fileSize: 10,
       posterUrl: localPosterPath[0].isEmpty
-          ? "https://picsum.photos/200/300?random=${randomNumber}"
+          ? "https://picsum.photos/seed/$fileName/800/1200" // TODO - Remover implementação temporária
           : localPosterPath[0],
     );
   }
