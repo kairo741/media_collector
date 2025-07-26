@@ -18,7 +18,7 @@ class MediaScannerService {
     '.3gp',
   ];
 
-  static const List<String> _imageExtensions = ['.png', '.jpg', '.webp'];
+  static const List<String> _imageExtensions = ['.png', '.jpg', '.webp', '.jpeg'];
 
   Future<List<MediaItem>> scanDirectory(String directoryPath) async {
     final List<MediaItem> mediaItems = [];
@@ -82,7 +82,7 @@ class MediaScannerService {
       final match = pattern.firstMatch(fileName);
       if (match != null) {
         return _EpisodeInfo(
-          title: match.group(1)?.replaceAll('.', ' ')?.trim() ?? fileName,
+          title: match.group(1)?.replaceAll('.', ' ').trim() ?? fileName,
           seasonNumber: int.tryParse(match.group(2) ?? ''),
           episodeNumber: int.tryParse(match.group(3) ?? ''),
         );
