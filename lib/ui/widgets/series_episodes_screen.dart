@@ -2,10 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:media_collector/core/models/media_item.dart';
+import 'package:media_collector/core/utils/ffmpeg_thumb_helper.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
 import 'package:provider/provider.dart';
-
-import 'ffmpeg_thumb_helper.dart';
 
 class SeriesEpisodesScreen extends StatelessWidget {
   final String seriesName;
