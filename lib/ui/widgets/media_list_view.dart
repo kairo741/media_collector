@@ -119,7 +119,7 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
       label: Text(label),
       selected: isSelected,
       onSelected: (_) => onTap(),
-      selectedColor: colorScheme.primary.withOpacity(0.2),
+      selectedColor: colorScheme.primary.withAlpha(50),
       checkmarkColor: colorScheme.secondary,
     );
   }
@@ -161,6 +161,7 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
     );
   }
 
+  // ignore: unused_element
   Widget _buildSeriesView(BuildContext context, MediaProvider mediaProvider) {
     final seriesGrouped = mediaProvider.getSeriesGrouped();
 
@@ -188,10 +189,7 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: Colors.green.withAlpha(25), borderRadius: BorderRadius.circular(12)),
                   child: Text(
                     '${episodes.length} episódio${episodes.length > 1 ? 's' : ''}',
                     style: TextStyle(fontSize: 12, color: Colors.green[700], fontWeight: FontWeight.w500),

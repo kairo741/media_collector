@@ -76,14 +76,20 @@ class DirectorySelector extends StatelessWidget {
   }
 
   Future<void> _selectDirectory(BuildContext context) async {
+    // Captura do MediaProvider antes da operação assíncrona
+    final mediaProvider = context.read<MediaProvider>();
+
     try {
       String? selectedDirectory = await FilePicker.platform.getDirectoryPath(dialogTitle: 'Selecione a pasta de mídia');
 
       if (selectedDirectory != null) {
-        await context.read<MediaProvider>().scanDirectory(selectedDirectory);
+        await mediaProvider.scanDirectory(selectedDirectory);
       }
     } catch (e) {
-      _showErrorDialog(context, 'Erro ao selecionar pasta: $e');
+      // Verifica se o contexto ainda é válido antes de mostrar o diálogo
+      if (context.mounted) {
+        _showErrorDialog(context, 'Erro ao selecionar pasta: $e');
+      }
     }
   }
 

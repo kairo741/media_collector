@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class MediaPlayerService {
@@ -6,7 +7,7 @@ class MediaPlayerService {
   Future<bool> openMediaFile(String filePath) async {
     try {
       final file = File(filePath);
-      
+
       if (!await file.exists()) {
         throw Exception('Arquivo não encontrado: $filePath');
       }
@@ -21,7 +22,7 @@ class MediaPlayerService {
         return await launchUrl(uri);
       }
     } catch (e) {
-      print('Erro ao abrir arquivo de mídia: $e');
+      if (kDebugMode) print('Erro ao abrir arquivo de mídia: $e');
       return false;
     }
   }
@@ -55,7 +56,7 @@ class MediaPlayerService {
         return await launchUrl(uri);
       }
     } catch (e) {
-      print('Erro ao abrir pasta: $e');
+      if (kDebugMode) print('Erro ao abrir pasta: $e');
       return false;
     }
   }
@@ -69,4 +70,4 @@ class MediaPlayerService {
       return false;
     }
   }
-} 
+}

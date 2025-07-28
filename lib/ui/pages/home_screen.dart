@@ -267,9 +267,9 @@ class HomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withAlpha(25),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withAlpha(76)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -286,14 +286,18 @@ class HomeScreen extends StatelessWidget {
   }
 
   Future<void> _selectDirectory(BuildContext context) async {
+    // Captura do MediaProvider antes da operação assíncrona
+    final mediaProvider = context.read<MediaProvider>();
     try {
       String? selectedDirectory = await FilePicker.platform.getDirectoryPath(dialogTitle: 'Selecione a pasta de mídia');
 
       if (selectedDirectory != null) {
-        await context.read<MediaProvider>().scanDirectory(selectedDirectory);
+        await mediaProvider.scanDirectory(selectedDirectory);
       }
     } catch (e) {
-      _showErrorDialog(context, 'Erro ao selecionar pasta: $e');
+      if (context.mounted) {
+        _showErrorDialog(context, 'Erro ao selecionar pasta: $e');
+      }
     }
   }
 
@@ -302,7 +306,9 @@ class HomeScreen extends StatelessWidget {
       final mediaProvider = context.read<MediaProvider>();
       await mediaProvider.scanDirectory(mediaProvider.selectedDirectory);
     } catch (e) {
-      _showErrorDialog(context, 'Erro ao reescanear pasta: $e');
+      if (context.mounted) {
+        _showErrorDialog(context, 'Erro ao reescanear pasta: $e');
+      }
     }
   }
 

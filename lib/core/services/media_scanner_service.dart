@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 
 import '../models/media_item.dart';
@@ -140,19 +141,19 @@ class MediaScannerService {
         if (entity is File) {
           final MediaItem? mediaItem = _processFile(entity);
           if (mediaItem != null) {
-            print("Media: ${mediaItem.title}");
+            if (kDebugMode) print("Media: ${mediaItem.title}");
             mediaItems.add(mediaItem);
           }
         } else if (entity is Directory) {
           final MediaItem? mediaItem = await _processSubDirs(entity, mediaItems);
           if (mediaItem != null) {
-            print("Dir: ${mediaItem.title}");
+            if (kDebugMode) print("Dir: ${mediaItem.title}");
             mediaItems.add(mediaItem);
           }
         }
       }
     } catch (e) {
-      print('Erro ao escanear diretório ${directory.path}: $e');
+      if (kDebugMode) print('Erro ao escanear diretório ${directory.path}: $e');
     }
   }
 
