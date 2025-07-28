@@ -4,17 +4,25 @@ import 'package:media_collector/ui/providers/media_provider.dart';
 import 'package:media_collector/ui/theme/theme.dart';
 import 'package:provider/provider.dart';
 
-void main() {
-  runApp(const MediaCollectorApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializa o MediaProvider que também inicializa o SettingsService
+  final mediaProvider = MediaProvider();
+  await mediaProvider.initialize();
+  
+  runApp(MediaCollectorApp(mediaProvider: mediaProvider));
 }
 
 class MediaCollectorApp extends StatelessWidget {
-  const MediaCollectorApp({super.key});
+  final MediaProvider mediaProvider;
+  
+  const MediaCollectorApp({super.key, required this.mediaProvider});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => MediaProvider(),
+    return ChangeNotifierProvider.value(
+      value: mediaProvider,
       child: MaterialApp(
         title: 'Media Collector',
         theme: MaterialTheme(ThemeData.dark().textTheme).dark(),

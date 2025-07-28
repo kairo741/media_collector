@@ -122,8 +122,9 @@ class _EpisodeCard extends StatelessWidget {
 
   const _EpisodeCard({required this.ep});
 
-  Future<String?> _getThumbPath() async {
-    return await FFmpegThumbHelper.getThumb(ep.filePath);
+  Future<String?> _getThumbPath(BuildContext context) async {
+    final quality = context.read<MediaProvider>().thumbnailQuality;
+    return await FFmpegThumbHelper.getThumb(ep.filePath, quality);
   }
 
   @override
@@ -142,7 +143,7 @@ class _EpisodeCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
                 child: FutureBuilder<String?>(
-                  future: _getThumbPath(),
+                  future: _getThumbPath(context), // TODO - Fazer validação caso o usuário configure sem thumbs
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
@@ -168,6 +169,7 @@ class _EpisodeCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
+            Spacer(),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               child: Row(

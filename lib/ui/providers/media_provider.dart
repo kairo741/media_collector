@@ -2,10 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:media_collector/core/models/media_item.dart';
 import 'package:media_collector/core/services/media_player_service.dart';
 import 'package:media_collector/core/services/media_scanner_service.dart';
+import 'package:media_collector/core/services/settings_service.dart';
 
 class MediaProvider extends ChangeNotifier {
   final MediaScannerService _scannerService = MediaScannerService();
   final MediaPlayerService _playerService = MediaPlayerService();
+  final SettingsService _settingsService = SettingsService();
 
   List<MediaItem> _mediaItems = [];
   List<MediaItem> _filteredItems = [];
@@ -41,6 +43,24 @@ class MediaProvider extends ChangeNotifier {
     return _mediaItems.fold(0, (sum, item) => sum + item.fileSize);
   }
 
+  /// Inicializa o provider e carrega configurações salvas
+  Future<void> initialize() async {
+    await _settingsService.initialize();
+    
+    // Carrega diretório salvo
+    final savedDirectory = _settingsService.getSelectedDirectory();
+    if (savedDirectory != null && savedDirectory.isNotEmpty) {
+      _selectedDirectory = savedDirectory;
+      
+      // Se auto-scan estiver habilitado, escaneia automaticamente
+      if ( _settingsService.currentSettings.autoScanOnStartup) {
+        await scanDirectory(savedDirectory);
+      }
+    }
+    
+    notifyListeners();
+  }
+
   /// Escaneia um diretório em busca de arquivos de mídia
   Future<void> scanDirectory(String directoryPath) async {
     _setScanning(true);
@@ -48,6 +68,10 @@ class MediaProvider extends ChangeNotifier {
 
     try {
       _selectedDirectory = directoryPath;
+      
+      // Salva o diretório selecionado
+      await _settingsService.setSelectedDirectory(directoryPath);
+      
       _mediaItems = await _scannerService.scanDirectory(directoryPath);
       _applyFilters();
       notifyListeners();
@@ -101,7 +125,7 @@ class MediaProvider extends ChangeNotifier {
 
   /// Define a query de busca
   void setSearchQuery(String query) {
-    _searchQuery = query.toLowerCase();
+    _searchQuery = query;
     _applyFilters();
     notifyListeners();
   }
@@ -116,29 +140,68 @@ class MediaProvider extends ChangeNotifier {
 
       // Filtro por busca
       if (_searchQuery.isNotEmpty) {
-        final searchLower = _searchQuery.toLowerCase();
-        return item.title.toLowerCase().contains(searchLower) ||
-            item.fileName.toLowerCase().contains(searchLower) ||
-            (item.seriesName?.toLowerCase().contains(searchLower) ?? false) ||
-            (item.year?.contains(searchLower) ?? false) ||
-            (item.quality?.toLowerCase().contains(searchLower) ?? false);
+        final query = _searchQuery.toLowerCase();
+        final title = item.title.toLowerCase();
+        final fileName = item.fileName.toLowerCase();
+        final seriesName = item.seriesName?.toLowerCase() ?? '';
+        
+        if (!title.contains(query) && 
+            !fileName.contains(query) && 
+            !seriesName.contains(query)) {
+          return false;
+        }
       }
 
       return true;
     }).toList();
-
-    // Ordenar por nome
-    _filteredItems.sort((a, b) => a.title.compareTo(b.title));
   }
 
-  /// Limpa todos os dados
-  void clearData() {
+  /// Obtém diretórios recentes
+  List<String> getRecentDirectories() {
+    return _settingsService.getRecentDirectories();
+  }
+
+  /// Obtém configurações de thumbnails
+  bool get enableThumbnails => _settingsService.currentSettings.enableThumbnails;
+  String get thumbnailQuality => _settingsService.currentSettings.thumbnailQuality;
+
+  /// Define configurações de thumbnails
+  Future<void> setThumbnailSettings({
+    bool? enableThumbnails,
+    String? thumbnailQuality,
+  }) async {
+    await _settingsService.setThumbnailSettings(
+      enableThumbnails: enableThumbnails,
+      thumbnailQuality: thumbnailQuality,
+    );
+  }
+
+  /// Define auto-scan na inicialização
+  Future<void> setAutoScanOnStartup(bool enabled) async {
+    await _settingsService.setAutoScanOnStartup(enabled);
+  }
+
+  /// Obtém extensões excluídas
+  List<String> getExcludedExtensions() {
+    return _settingsService.getExcludedExtensions();
+  }
+
+  /// Adiciona extensão excluída
+  Future<void> addExcludedExtension(String extension) async {
+    await _settingsService.addExcludedExtension(extension);
+  }
+
+  /// Remove extensão excluída
+  Future<void> removeExcludedExtension(String extension) async {
+    await _settingsService.removeExcludedExtension(extension);
+  }
+
+  /// Reseta configurações
+  Future<void> resetSettings() async {
+    await _settingsService.resetSettings();
+    _selectedDirectory = '';
     _mediaItems.clear();
     _filteredItems.clear();
-    _selectedDirectory = '';
-    _selectedFilter = null;
-    _searchQuery = '';
-    _clearError();
     notifyListeners();
   }
 

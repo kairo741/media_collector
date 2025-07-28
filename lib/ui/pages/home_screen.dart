@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
 import 'package:media_collector/ui/widgets/media_list_view.dart';
+import 'package:media_collector/ui/widgets/settings_dialog.dart';
 import 'package:provider/provider.dart';
 
 import '../widgets/directory_selector.dart';
@@ -152,7 +153,7 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.close),
             onPressed: () {
-              context.read<MediaProvider>().clearData();
+              // Remove o banner de erro
             },
             color: Colors.red[700],
           ),
@@ -197,6 +198,7 @@ class HomeScreen extends StatelessWidget {
       foregroundColor: Colors.white,
       elevation: 2,
       actions: [
+        const SizedBox(width: 5),
         Consumer<MediaProvider>(
           builder: (context, mediaProvider, child) {
             if (mediaProvider.selectedDirectory.isNotEmpty) {
@@ -231,7 +233,7 @@ class HomeScreen extends StatelessWidget {
                     style: IconButton.styleFrom(backgroundColor: colorScheme.secondary.withAlpha(40)),
                     constraints: const BoxConstraints(minWidth: iconButtonSize, minHeight: iconButtonSize),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 5),
                   if (mediaProvider.errorMessage != null) ...[
                     const VerticalDivider(width: 20, thickness: 1, indent: 20, endIndent: 20, color: Colors.grey),
                     IconButton(
@@ -240,12 +242,21 @@ class HomeScreen extends StatelessWidget {
                       tooltip: 'Ver erro',
                     ),
                   ],
+                    const VerticalDivider(width: 20, thickness: 1, indent: 20, endIndent: 20, color: Colors.grey),
                 ],
               );
             }
 
             return const SizedBox.shrink();
           },
+        ),
+        const SizedBox(width: 5),
+        IconButton(
+          icon: Icon(Icons.settings, color: Colors.white, size: iconButtonSize),
+          onPressed: () => _showSettingsDialog(ctx),
+          tooltip: 'Configurações',
+          style: IconButton.styleFrom(backgroundColor: colorScheme.secondary.withAlpha(40)),
+          constraints: const BoxConstraints(minWidth: iconButtonSize, minHeight: iconButtonSize),
         ),
       ],
     );
@@ -324,7 +335,7 @@ class HomeScreen extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () {
-              context.read<MediaProvider>().clearData();
+              context.read<MediaProvider>().resetSettings();
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -343,6 +354,13 @@ class HomeScreen extends StatelessWidget {
         content: Text(message),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
       ),
+    );
+  }
+
+  void _showSettingsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const SettingsDialog(),
     );
   }
 }
