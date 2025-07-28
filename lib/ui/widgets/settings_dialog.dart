@@ -14,6 +14,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
   String _thumbnailQuality = 'medium';
   bool _autoScanOnStartup = true;
   List<String> _excludedExtensions = [];
+  String _thumbnailsSize = '0 MB';
+  bool _isCalculatingSize = false;
 
   @override
   void initState() {
@@ -31,6 +33,87 @@ class _SettingsDialogState extends State<SettingsDialog> {
       _autoScanOnStartup = true; // Será carregado do SettingsService
       _excludedExtensions = List.from(mediaProvider.getExcludedExtensions());
     });
+    _calculateThumbnailsSize();
+  }
+
+  Future<void> _calculateThumbnailsSize() async {
+    if (_isCalculatingSize) return;
+    
+    setState(() {
+      _isCalculatingSize = true;
+    });
+
+    try {
+      final mediaProvider = context.read<MediaProvider>();
+      final size = await mediaProvider.getThumbnailsSize();
+      if (mounted) {
+        setState(() {
+          _thumbnailsSize = size;
+          _isCalculatingSize = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _thumbnailsSize = 'Erro ao calcular';
+          _isCalculatingSize = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _clearThumbnails() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Limpar Thumbnails'),
+        content: const Text(
+          'Tem certeza que deseja limpar todas as thumbnails? '
+          'Isso liberará espaço em disco, mas as thumbnails serão regeneradas quando necessário.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Limpar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final mediaProvider = context.read<MediaProvider>();
+        final success = await mediaProvider.clearThumbnails();
+        
+        if (mounted) {
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Thumbnails limpas com sucesso!')),
+            );
+            // Recalcula o tamanho após limpar
+            await _calculateThumbnailsSize();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Erro ao limpar thumbnails')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao limpar thumbnails: $e')),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -105,6 +188,68 @@ class _SettingsDialogState extends State<SettingsDialog> {
             },
           ),
         ],
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.storage, size: 20, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Espaço ocupado pelas thumbnails:',
+                    style: TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (_isCalculatingSize)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    Text(
+                      _thumbnailsSize,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: _isCalculatingSize ? null : _calculateThumbnailsSize,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        tooltip: 'Recalcular',
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: _isCalculatingSize ? null : _clearThumbnails,
+                        icon: const Icon(Icons.delete_sweep, size: 18),
+                        label: const Text('Limpar Thumbnails'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

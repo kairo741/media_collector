@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:media_collector/core/models/media_item.dart';
 import 'package:media_collector/core/services/media_player_service.dart';
@@ -194,6 +195,50 @@ class MediaProvider extends ChangeNotifier {
   /// Remove extensão excluída
   Future<void> removeExcludedExtension(String extension) async {
     await _settingsService.removeExcludedExtension(extension);
+  }
+
+  /// Calcula o tamanho total ocupado pelas thumbnails em disco
+  Future<String> getThumbnailsSize() async {
+    try {
+      final tempDir = Directory('${Directory.systemTemp.path}\\media_collector_thumb');
+      if (!await tempDir.exists()) {
+        return '0 MB';
+      }
+
+      int totalSize = 0;
+      await for (final entity in tempDir.list(recursive: true)) {
+        if (entity is File) {
+          totalSize += await entity.length();
+        }
+      }
+
+      if (totalSize < 1024) {
+        return '$totalSize B';
+      } else if (totalSize < 1024 * 1024) {
+        return '${(totalSize / 1024).toStringAsFixed(1)} KB';
+      } else {
+        return '${(totalSize / (1024 * 1024)).toStringAsFixed(1)} MB';
+      }
+    } catch (e) {
+      debugPrint('Erro ao calcular tamanho das thumbnails: $e');
+      return '0 MB';
+    }
+  }
+
+  /// Limpa todas as thumbnails
+  Future<bool> clearThumbnails() async {
+    try {
+      final tempDir = Directory('${Directory.systemTemp.path}\\media_collector_thumb');
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+        debugPrint('Thumbnails limpas com sucesso');
+        return true;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Erro ao limpar thumbnails: $e');
+      return false;
+    }
   }
 
   /// Reseta configurações
