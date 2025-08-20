@@ -200,6 +200,20 @@ class SettingsService extends ChangeNotifier {
     return _currentSettings?.excludedExtensions ?? [];
   }
 
+  /// Define a pasta alternativa para posters
+  Future<void> setAlternativePosterDirectory(String? directory) async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.alternativePosterDirectory = directory;
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Obtém a pasta alternativa para posters
+  String? getAlternativePosterDirectory() {
+    return _currentSettings?.alternativePosterDirectory;
+  }
+
   /// Reseta todas as configurações
   Future<void> resetSettings() async {
     _currentSettings = UserSettings();

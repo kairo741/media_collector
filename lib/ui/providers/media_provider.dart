@@ -197,6 +197,16 @@ class MediaProvider extends ChangeNotifier {
     await _settingsService.removeExcludedExtension(extension);
   }
 
+  /// Define a pasta alternativa para posters
+  Future<void> setAlternativePosterDirectory(String? directory) async {
+    await _settingsService.setAlternativePosterDirectory(directory);
+  }
+
+  /// Obtém a pasta alternativa para posters
+  String? getAlternativePosterDirectory() {
+    return _settingsService.getAlternativePosterDirectory();
+  }
+
   /// Calcula o tamanho total ocupado pelas thumbnails em disco
   Future<String> getThumbnailsSize() async {
     try {

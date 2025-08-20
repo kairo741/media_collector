@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 
 import '../models/media_item.dart';
+import '../services/settings_service.dart';
 
 class MediaScannerService {
   static const List<String> _videoExtensions = [
@@ -170,6 +171,9 @@ class MediaScannerService {
     // Tentar extrair informações do nome do arquivo
     final MediaInfo mediaInfo = _extractMediaInfo(fileNameWithoutExtension, MediaType.movie);
 
+    // Tentar buscar poster local na pasta alternativa
+    final String? localPosterPath = _getLocalPoster(path.dirname(file.path), fileName);
+
     return MediaItem(
       id: _generateId(file.path),
       title: mediaInfo.title,
@@ -184,7 +188,7 @@ class MediaScannerService {
       language: mediaInfo.language,
       lastModified: file.lastModifiedSync(),
       fileSize: file.lengthSync(),
-      posterUrl: "https://picsum.photos/seed/$fileName/800/1200", // TODO - Remover implementação temporária
+      posterUrl: localPosterPath,
     );
   }
 
@@ -224,9 +228,7 @@ class MediaScannerService {
       language: mediaInfo.language,
       lastModified: DateTime.now(),
       fileSize: 10,
-      posterUrl: localPosterPath[0].isEmpty
-          ? "https://picsum.photos/seed/$fileName/800/1200" // TODO - Remover implementação temporária
-          : localPosterPath[0],
+      posterUrl: localPosterPath[0].isEmpty ? _getLocalPoster(dir.path, fileName) : localPosterPath[0],
     );
   }
 
@@ -243,6 +245,61 @@ class MediaScannerService {
           contentList.add(entity.path);
         }
       }
+    }
+  }
+
+  _getLocalPoster(String dirPath, String mediaFileNm) {
+    try {
+      // Obter o caminho alternativo para posters das configurações
+      final SettingsService settingsService = SettingsService();
+      final String? alternativePosterDir = settingsService.getAlternativePosterDirectory();
+
+      if (alternativePosterDir == null || alternativePosterDir.isEmpty) {
+        return null;
+      }
+
+      // Verificar se o diretório alternativo existe
+      final Directory altDir = Directory(alternativePosterDir);
+      if (!altDir.existsSync()) {
+        return null;
+      }
+
+      // Obter o nome do arquivo sem extensão para buscar o poster correspondente
+      final String fileNameWithoutExt = path.basenameWithoutExtension(mediaFileNm);
+
+      // Buscar por arquivos de imagem com o mesmo nome
+      for (final String ext in _imageExtensions) {
+        final String posterPath = path.join(alternativePosterDir, '$fileNameWithoutExt$ext');
+        final File posterFile = File(posterPath);
+
+        if (posterFile.existsSync()) {
+          return posterPath;
+        }
+      }
+
+      // Se não encontrou com extensão exata, tentar buscar por correspondência parcial
+      // (útil para casos onde o nome do arquivo de mídia e do poster podem ter pequenas diferenças)
+      final List<FileSystemEntity> files = altDir.listSync();
+
+      for (final FileSystemEntity entity in files) {
+        if (entity is File) {
+          final String ext = path.extension(entity.path).toLowerCase();
+          if (_imageExtensions.contains(ext)) {
+            final String entityName = path.basenameWithoutExtension(entity.path);
+
+            // Verificar se o nome do arquivo de mídia contém o nome do poster ou vice-versa
+            if (fileNameWithoutExt.toLowerCase().contains(entityName.toLowerCase()) ||
+                entityName.toLowerCase().contains(fileNameWithoutExt.toLowerCase())) {
+              return entity.path;
+            }
+          }
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Erro ao buscar poster local: $e');
+      return null;
     }
   }
 

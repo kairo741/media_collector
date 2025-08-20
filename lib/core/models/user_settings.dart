@@ -28,6 +28,9 @@ class UserSettings extends HiveObject {
   @HiveField(7)
   String thumbnailQuality; // 'low', 'medium', 'high'
 
+  @HiveField(8)
+  String? alternativePosterDirectory; // Pasta alternativa para buscar posters
+
   UserSettings({
     this.selectedDirectory,
     List<String>? recentDirectories,
@@ -37,6 +40,7 @@ class UserSettings extends HiveObject {
     this.maxRecentDirectories = 5,
     this.enableThumbnails = true,
     this.thumbnailQuality = 'medium',
+    this.alternativePosterDirectory,
   })  : recentDirectories = recentDirectories ?? [],
         mediaMetadata = mediaMetadata ?? {},
         excludedExtensions = excludedExtensions ?? [];
@@ -79,6 +83,7 @@ class UserSettings extends HiveObject {
     int? maxRecentDirectories,
     bool? enableThumbnails,
     String? thumbnailQuality,
+    String? alternativePosterDirectory,
   }) {
     return UserSettings(
       selectedDirectory: selectedDirectory ?? this.selectedDirectory,
@@ -89,6 +94,7 @@ class UserSettings extends HiveObject {
       maxRecentDirectories: maxRecentDirectories ?? this.maxRecentDirectories,
       enableThumbnails: enableThumbnails ?? this.enableThumbnails,
       thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
+      alternativePosterDirectory: alternativePosterDirectory ?? this.alternativePosterDirectory,
     );
   }
 } 
