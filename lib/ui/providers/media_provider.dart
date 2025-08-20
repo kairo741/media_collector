@@ -47,18 +47,18 @@ class MediaProvider extends ChangeNotifier {
   /// Inicializa o provider e carrega configurações salvas
   Future<void> initialize() async {
     await _settingsService.initialize();
-    
+
     // Carrega diretório salvo
     final savedDirectory = _settingsService.getSelectedDirectory();
     if (savedDirectory != null && savedDirectory.isNotEmpty) {
       _selectedDirectory = savedDirectory;
-      
+
       // Se auto-scan estiver habilitado, escaneia automaticamente
       if ( _settingsService.currentSettings.autoScanOnStartup) {
         await scanDirectory(savedDirectory);
       }
     }
-    
+
     notifyListeners();
   }
 
@@ -69,11 +69,15 @@ class MediaProvider extends ChangeNotifier {
 
     try {
       _selectedDirectory = directoryPath;
-      
+
       // Salva o diretório selecionado
       await _settingsService.setSelectedDirectory(directoryPath);
-      
+
       _mediaItems = await _scannerService.scanDirectory(directoryPath);
+
+      // Carrega títulos personalizados salvos
+      _loadCustomTitles();
+
       _applyFilters();
       notifyListeners();
     } catch (e) {
@@ -145,9 +149,11 @@ class MediaProvider extends ChangeNotifier {
         final title = item.title.toLowerCase();
         final fileName = item.fileName.toLowerCase();
         final seriesName = item.seriesName?.toLowerCase() ?? '';
-        
-        if (!title.contains(query) && 
-            !fileName.contains(query) && 
+        final customTitle = item.customTitle?.toLowerCase() ?? '';
+
+        if (!title.contains(query) &&
+            !fileName.contains(query) &&
+            !customTitle.contains(query) &&
             !seriesName.contains(query)) {
           return false;
         }
@@ -155,6 +161,15 @@ class MediaProvider extends ChangeNotifier {
 
       return true;
     }).toList();
+
+    // Ordena a lista alfabeticamente usando o título personalizado quando disponível
+    _filteredItems.sort((a, b) {
+      // Usa o título personalizado se disponível, senão usa o título original
+      final titleA = (a.customTitle ?? a.title).toLowerCase();
+      final titleB = (b.customTitle ?? b.title).toLowerCase();
+      
+      return titleA.compareTo(titleB);
+    });
   }
 
   /// Obtém diretórios recentes
@@ -205,6 +220,59 @@ class MediaProvider extends ChangeNotifier {
   /// Obtém a pasta alternativa para posters
   String? getAlternativePosterDirectory() {
     return _settingsService.getAlternativePosterDirectory();
+  }
+
+  /// Define um título personalizado para uma mídia
+  Future<void> setCustomTitle(MediaItem item, String customTitle) async {
+    await _settingsService.setCustomTitle(item.filePath, customTitle);
+
+    // Atualiza o item na lista local
+    final index = _mediaItems.indexWhere((m) => m.id == item.id);
+    if (index != -1) {
+      _mediaItems[index] = item.copyWithCustomTitle(customTitle);
+      _applyFilters();
+      notifyListeners();
+    }
+  }
+
+  /// Remove o título personalizado de uma mídia
+  Future<void> removeCustomTitle(MediaItem item) async {
+    await _settingsService.removeCustomTitle(item.filePath);
+
+    // Atualiza o item na lista local
+    final index = _mediaItems.indexWhere((m) => m.id == item.id);
+    if (index != -1) {
+      _mediaItems[index] = item.copyWithCustomTitle(null);
+      _applyFilters();
+      notifyListeners();
+    }
+  }
+
+  /// Obtém o título personalizado de uma mídia
+  String? getCustomTitle(MediaItem item) {
+    return _settingsService.getCustomTitle(item.filePath);
+  }
+
+  /// Limpa todos os títulos personalizados
+  Future<void> clearCustomTitles() async {
+    await _settingsService.clearCustomTitles();
+
+    // Atualiza todos os itens na lista local
+    for (int i = 0; i < _mediaItems.length; i++) {
+      _mediaItems[i] = _mediaItems[i].copyWithCustomTitle(null);
+    }
+    _applyFilters();
+    notifyListeners();
+  }
+
+  /// Carrega títulos personalizados salvos para os itens de mídia
+  void _loadCustomTitles() {
+    for (int i = 0; i < _mediaItems.length; i++) {
+      final customTitle = _settingsService.getCustomTitle(_mediaItems[i].filePath);
+      if (customTitle != null) {
+        _mediaItems[i] = _mediaItems[i].copyWithCustomTitle(customTitle);
+      }
+    }
   }
 
   /// Calcula o tamanho total ocupado pelas thumbnails em disco

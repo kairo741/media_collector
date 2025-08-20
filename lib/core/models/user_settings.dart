@@ -31,6 +31,9 @@ class UserSettings extends HiveObject {
   @HiveField(8)
   String? alternativePosterDirectory; // Pasta alternativa para buscar posters
 
+  @HiveField(9)
+  Map<String, String> customTitles; // filePath -> customTitle
+
   UserSettings({
     this.selectedDirectory,
     List<String>? recentDirectories,
@@ -41,9 +44,11 @@ class UserSettings extends HiveObject {
     this.enableThumbnails = true,
     this.thumbnailQuality = 'medium',
     this.alternativePosterDirectory,
+    Map<String, String>? customTitles,
   })  : recentDirectories = recentDirectories ?? [],
         mediaMetadata = mediaMetadata ?? {},
-        excludedExtensions = excludedExtensions ?? [];
+        excludedExtensions = excludedExtensions ?? [],
+        customTitles = customTitles ?? {};
 
   // Métodos auxiliares
   void addRecentDirectory(String directory) {
@@ -73,6 +78,30 @@ class UserSettings extends HiveObject {
     mediaMetadata.clear();
   }
 
+  /// Define um título personalizado para uma mídia
+  void setCustomTitle(String filePath, String customTitle) {
+    if (customTitle.trim().isEmpty) {
+      customTitles.remove(filePath);
+    } else {
+      customTitles[filePath] = customTitle.trim();
+    }
+  }
+
+  /// Obtém o título personalizado de uma mídia
+  String? getCustomTitle(String filePath) {
+    return customTitles[filePath];
+  }
+
+  /// Remove o título personalizado de uma mídia
+  void removeCustomTitle(String filePath) {
+    customTitles.remove(filePath);
+  }
+
+  /// Limpa todos os títulos personalizados
+  void clearCustomTitles() {
+    customTitles.clear();
+  }
+
   // Cria uma cópia das configurações
   UserSettings copyWith({
     String? selectedDirectory,
@@ -84,6 +113,7 @@ class UserSettings extends HiveObject {
     bool? enableThumbnails,
     String? thumbnailQuality,
     String? alternativePosterDirectory,
+    Map<String, String>? customTitles,
   }) {
     return UserSettings(
       selectedDirectory: selectedDirectory ?? this.selectedDirectory,
@@ -95,6 +125,7 @@ class UserSettings extends HiveObject {
       enableThumbnails: enableThumbnails ?? this.enableThumbnails,
       thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
       alternativePosterDirectory: alternativePosterDirectory ?? this.alternativePosterDirectory,
+      customTitles: customTitles ?? Map.from(this.customTitles),
     );
   }
 } 

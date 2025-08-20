@@ -20,6 +20,7 @@ class MediaScannerService {
   ];
 
   static const List<String> _imageExtensions = ['.png', '.jpg', '.webp', '.jpeg'];
+  final SettingsService _settingsService = SettingsService();
 
   Future<List<MediaItem>> scanDirectory(String directoryPath) async {
     final List<MediaItem> mediaItems = [];
@@ -47,7 +48,7 @@ class MediaScannerService {
         final fileName = path.basename(entity.path);
         final fileNameNoExt = path.basenameWithoutExtension(entity.path);
         final info = _extractEpisodeInfo(fileNameNoExt, entity.path);
-
+        final customTitle = _settingsService.getCustomTitle(entity.path);
         episodes.add(
           MediaItem(
             id: entity.path.hashCode.toString(),
@@ -63,6 +64,7 @@ class MediaScannerService {
             language: null,
             lastModified: await entity.lastModified(),
             fileSize: await entity.length(),
+             customTitle: customTitle
           ),
         );
       }

@@ -4,43 +4,50 @@ import 'package:flutter/material.dart';
 import 'package:media_collector/core/models/media_item.dart';
 import 'package:media_collector/core/utils/ffmpeg_thumb_helper.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
+import 'package:media_collector/ui/widgets/rename_dialog.dart';
 import 'package:provider/provider.dart';
 
-class SeriesEpisodesScreen extends StatelessWidget {
+class SeriesEpisodesScreen extends StatefulWidget {
   final String seriesName;
 
   const SeriesEpisodesScreen({super.key, required this.seriesName});
 
   @override
+  State<SeriesEpisodesScreen> createState() => _SeriesEpisodesScreenState();
+}
+
+class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
+  @override
   Widget build(BuildContext context) {
     final mediaProvider = context.read<MediaProvider>();
+    final colorScheme = Theme.of(context).colorScheme;
     // Encontrar o MediaItem da série
     MediaItem? serie;
     try {
       serie = mediaProvider.mediaItems.firstWhere(
-        (item) => item.type == MediaType.series && (item.seriesName ?? item.title) == seriesName,
+        (item) => item.type == MediaType.series && (item.seriesName ?? item.title) == widget.seriesName,
       );
     } catch (_) {
       serie = null;
     }
     if (serie == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(seriesName)),
+        appBar: AppBar(title: Text(widget.seriesName)),
         body: const Center(child: Text('Série não encontrada.')),
       );
     }
     return FutureBuilder<List<MediaItem>>(
-      future: mediaProvider.scanSeriesEpisodes(serie.filePath, seriesName),
+      future: mediaProvider.scanSeriesEpisodes(serie.filePath, widget.seriesName),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            appBar: AppBar(title: Text(seriesName)),
+            appBar: AppBar(title: Text(serie?.displayTitle ?? widget.seriesName)),
             body: const Center(child: CircularProgressIndicator()),
           );
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: Text(seriesName)),
+            appBar: AppBar(title: Text(serie?.displayTitle ?? widget.seriesName)),
             body: const Center(child: Text('Nenhum episódio encontrado.')),
           );
         }
@@ -52,7 +59,20 @@ class SeriesEpisodesScreen extends StatelessWidget {
           bySeason.putIfAbsent(season, () => []).add(ep);
         }
         return Scaffold(
-          appBar: AppBar(title: Text(seriesName)),
+          appBar: AppBar(
+            title: Text(serie?.displayTitle ?? widget.seriesName),
+            actionsPadding: EdgeInsets.only(right: 15),
+            actions: [
+              IconButton(
+                // TODO - Implementação temporária para gerenciamento de estado dos eps
+                icon: Icon(Icons.refresh, color: colorScheme.primary, size: 18.0),
+                onPressed: mediaProvider.isScanning ? null : () => setState(() {}),
+                tooltip: 'Atualizar',
+                style: IconButton.styleFrom(backgroundColor: colorScheme.secondary.withAlpha(40)),
+                constraints: const BoxConstraints(minWidth: 18.0, minHeight: 18.0),
+              ),
+            ],
+          ),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: bySeason.entries.toList().asMap().entries.map((entry) {
@@ -135,6 +155,7 @@ class _EpisodeCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () => context.read<MediaProvider>().openMediaFile(ep),
+        onSecondaryTapDown: (TapDownDetails details) => _showContextMenu(context, details.globalPosition),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -161,12 +182,26 @@ class _EpisodeCard extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Text(
-                "${ep.episodeNumber != null ? '${ep.episodeNumber} | ' : ''}${ep.title}",
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+              child: Column(
+                children: [
+                  Text(
+                    "${ep.episodeNumber != null ? '${ep.episodeNumber} | ' : ''}${ep.displayTitle}",
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  if (ep.customTitle != null && ep.title != ep.fileName)
+                    Text(
+                      ep.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600], fontStyle: FontStyle.italic),
+                    ),
+                ],
               ),
             ),
             Spacer(),
@@ -239,5 +274,111 @@ class _EpisodeCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy - 200, // Posiciona acima da posição do mouse
+        position.dx + 200, // Largura do menu
+        position.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'play',
+          child: Row(
+            children: [
+              const Icon(Icons.play_arrow, color: Colors.green, size: 20),
+              const SizedBox(width: 8),
+              const Text('Reproduzir'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'folder',
+          child: Row(
+            children: [
+              const Icon(Icons.folder_open, color: Colors.blue, size: 20),
+              const SizedBox(width: 8),
+              const Text('Abrir pasta'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'rename',
+          child: Row(
+            children: [
+              Icon(
+                context.read<MediaProvider>().getCustomTitle(ep) != null ? Icons.edit : Icons.edit_outlined,
+                color: context.read<MediaProvider>().getCustomTitle(ep) != null ? Colors.orange : Colors.grey,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(context.read<MediaProvider>().getCustomTitle(ep) != null ? 'Editar título' : 'Renomear'),
+            ],
+          ),
+        ),
+        if (context.read<MediaProvider>().getCustomTitle(ep) != null) ...[
+          PopupMenuItem(
+            value: 'remove_custom',
+            child: Row(
+              children: [
+                Icon(Icons.clear, color: Colors.red, size: 20),
+                const SizedBox(width: 8),
+                Text('Remover personalização'),
+              ],
+            ),
+          ),
+        ],
+        PopupMenuItem(
+          value: 'info',
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+              const SizedBox(width: 8),
+              const Text('Informações do arquivo'),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (context.mounted) {
+        switch (value) {
+          case 'play':
+            context.read<MediaProvider>().openMediaFile(ep);
+            break;
+          case 'folder':
+            context.read<MediaProvider>().openContainingFolder(ep);
+            break;
+          case 'remove_custom':
+            context.read<MediaProvider>().removeCustomTitle(ep);
+            break;
+          case 'rename':
+            final mediaProvider = context.read<MediaProvider>();
+            final currentCustomTitle = mediaProvider.getCustomTitle(ep);
+            showDialog(
+              context: context,
+              builder: (context) => RenameDialog(
+                mediaItem: ep,
+                currentCustomTitle: currentCustomTitle,
+                onRename: (newTitle) {
+                  mediaProvider.setCustomTitle(ep, newTitle);
+                },
+                onRemoveCustomTitle: currentCustomTitle != null
+                    ? () {
+                        mediaProvider.removeCustomTitle(ep);
+                      }
+                    : null,
+              ),
+            );
+            break;
+          case 'info':
+            _showFileInfo(context);
+            break;
+        }
+      }
+    });
   }
 }

@@ -124,6 +124,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
               const Divider(),
               _buildGeneralSettings(),
               const Divider(),
+              _buildCustomTitlesSettings(),
+              const Divider(),
               _buildExcludedExtensions(),
             ],
           ),
@@ -301,6 +303,46 @@ class _SettingsDialogState extends State<SettingsDialog> {
     });
   }
 
+  Future<void> _clearAllCustomTitles() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Limpar Títulos Personalizados'),
+        content: const Text(
+          'Tem certeza que deseja remover todos os títulos personalizados? '
+          'Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
+            child: const Text('Limpar Todos'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final mediaProvider = context.read<MediaProvider>();
+        await mediaProvider.clearCustomTitles();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Todos os títulos personalizados foram removidos!')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao limpar títulos personalizados: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _showAlternativePosterDirectoryDialog() async {
     try {
       final selectedDirectory = await FilePicker.platform.getDirectoryPath(
@@ -334,6 +376,59 @@ class _SettingsDialogState extends State<SettingsDialog> {
               _autoScanOnStartup = value;
             });
           },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCustomTitlesSettings() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Títulos Personalizados', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        const Text(
+          'Gerencie os títulos personalizados das suas mídias:',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.edit, size: 20, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Os títulos personalizados são salvos apenas no programa e não alteram os arquivos originais.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _clearAllCustomTitles,
+                    icon: const Icon(Icons.clear_all, size: 18),
+                    label: const Text('Limpar Todos os Títulos Personalizados'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );

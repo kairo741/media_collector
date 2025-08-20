@@ -214,6 +214,38 @@ class SettingsService extends ChangeNotifier {
     return _currentSettings?.alternativePosterDirectory;
   }
 
+  /// Define um título personalizado para uma mídia
+  Future<void> setCustomTitle(String filePath, String customTitle) async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.setCustomTitle(filePath, customTitle);
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Obtém o título personalizado de uma mídia
+  String? getCustomTitle(String filePath) {
+    return _currentSettings?.getCustomTitle(filePath);
+  }
+
+  /// Remove o título personalizado de uma mídia
+  Future<void> removeCustomTitle(String filePath) async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.removeCustomTitle(filePath);
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Limpa todos os títulos personalizados
+  Future<void> clearCustomTitles() async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.clearCustomTitles();
+    await saveSettings();
+    notifyListeners();
+  }
+
   /// Reseta todas as configurações
   Future<void> resetSettings() async {
     _currentSettings = UserSettings();

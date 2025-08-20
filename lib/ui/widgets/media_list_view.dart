@@ -4,10 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:media_collector/core/models/media_item.dart';
 import 'package:media_collector/core/utils/string_extensions.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
+import 'package:media_collector/ui/widgets/rename_dialog.dart';
 import 'package:media_collector/ui/widgets/series_episodes_screen.dart';
 import 'package:provider/provider.dart';
-
-import 'media_item_card.dart';
 
 class MediaListView extends StatefulWidget {
   const MediaListView({super.key});
@@ -161,54 +160,6 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
     );
   }
 
-  // ignore: unused_element
-  Widget _buildSeriesView(BuildContext context, MediaProvider mediaProvider) {
-    final seriesGrouped = mediaProvider.getSeriesGrouped();
-
-    if (seriesGrouped.isEmpty) {
-      return _buildEmptyState(context);
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: seriesGrouped.length,
-      itemBuilder: (context, index) {
-        final seriesName = seriesGrouped.keys.elementAt(index);
-        final episodes = seriesGrouped[seriesName]!;
-
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.only(bottom: 16),
-          child: ExpansionTile(
-            title: Row(
-              children: [
-                const Icon(Icons.tv, color: Colors.green),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(seriesName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.green.withAlpha(25), borderRadius: BorderRadius.circular(12)),
-                  child: Text(
-                    '${episodes.length} episódio${episodes.length > 1 ? 's' : ''}',
-                    style: TextStyle(fontSize: 12, color: Colors.green[700], fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-            children: episodes.map((episode) {
-              return Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
-                child: MediaItemCard(item: episode),
-              );
-            }).toList(),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
@@ -248,6 +199,7 @@ class _MediaPosterCard extends StatelessWidget {
           context.read<MediaProvider>().openMediaFile(item);
         }
       },
+      onSecondaryTapDown: (TapDownDetails details) => _showContextMenu(context, details.globalPosition),
       child: Card(
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -264,14 +216,29 @@ class _MediaPosterCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: SizedBox(
-                height: 25,
+                height: item.customTitle != null && item.title != item.fileName ? 40 : 25,
                 child: Center(
-                  child: Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        item.displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (item.customTitle != null && item.title != item.fileName)
+                        Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: Colors.grey[600], fontStyle: FontStyle.italic),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -301,6 +268,24 @@ class _MediaPosterCard extends StatelessWidget {
                       tooltip: 'Informações',
                       onPressed: () {
                         _showFileInfo(context);
+                        final mediaProvider = context.read<MediaProvider>();
+                        final currentCustomTitle = mediaProvider.getCustomTitle(item);
+
+                        showDialog(
+                          context: context,
+                          builder: (context) => RenameDialog(
+                            mediaItem: item,
+                            currentCustomTitle: currentCustomTitle,
+                            onRename: (newTitle) {
+                              mediaProvider.setCustomTitle(item, newTitle);
+                            },
+                            onRemoveCustomTitle: currentCustomTitle != null
+                                ? () {
+                                    mediaProvider.removeCustomTitle(item);
+                                  }
+                                : null,
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -393,5 +378,118 @@ class _MediaPosterCard extends StatelessWidget {
 
   String _formatDate(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy - 200, // Posiciona acima da posição do mouse
+        position.dx + 200, // Largura do menu
+        position.dy,
+      ),
+      items: [
+        PopupMenuItem(
+          value: 'play',
+          child: Row(
+            children: [
+              const Icon(Icons.play_arrow, color: Colors.green, size: 20),
+              const SizedBox(width: 8),
+              const Text('Reproduzir'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'folder',
+          child: Row(
+            children: [
+              const Icon(Icons.folder_open, color: Colors.blue, size: 20),
+              const SizedBox(width: 8),
+              const Text('Abrir pasta'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'rename',
+          child: Row(
+            children: [
+              Icon(
+                context.read<MediaProvider>().getCustomTitle(item) != null ? Icons.edit : Icons.edit_outlined,
+                color: context.read<MediaProvider>().getCustomTitle(item) != null ? Colors.orange : Colors.grey,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(context.read<MediaProvider>().getCustomTitle(item) != null ? 'Editar título' : 'Renomear'),
+            ],
+          ),
+        ),
+        if (context.read<MediaProvider>().getCustomTitle(item) != null) ...[
+          PopupMenuItem(
+            value: 'remove_custom',
+            child: Row(
+              children: [
+                Icon(Icons.clear, color: Colors.red, size: 20),
+                const SizedBox(width: 8),
+                Text('Remover personalização'),
+              ],
+            ),
+          ),
+        ],
+        PopupMenuItem(
+          value: 'info',
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+              const SizedBox(width: 8),
+              const Text('Informações do arquivo'),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (context.mounted) {
+        switch (value) {
+          case 'play':
+            if (!(item.type == MediaType.series)) {
+              context.read<MediaProvider>().openMediaFile(item);
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => SeriesEpisodesScreen(seriesName: item.seriesName ?? item.title)),
+              );
+            }
+            break;
+          case 'folder':
+            context.read<MediaProvider>().openContainingFolder(item);
+            break;
+          case 'remove_custom':
+            context.read<MediaProvider>().removeCustomTitle(item);
+            break;
+          case 'rename':
+            final mediaProvider = context.read<MediaProvider>();
+            final currentCustomTitle = mediaProvider.getCustomTitle(item);
+
+            showDialog(
+              context: context,
+              builder: (context) => RenameDialog(
+                mediaItem: item,
+                currentCustomTitle: currentCustomTitle,
+                onRename: (newTitle) {
+                  mediaProvider.setCustomTitle(item, newTitle);
+                },
+                onRemoveCustomTitle: currentCustomTitle != null
+                    ? () {
+                        mediaProvider.removeCustomTitle(item);
+                      }
+                    : null,
+              ),
+            );
+            break;
+          case 'info':
+            _showFileInfo(context);
+            break;
+        }
+      }
+    });
   }
 }

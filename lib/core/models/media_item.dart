@@ -13,6 +13,7 @@ class MediaItem {
   final DateTime lastModified;
   final int fileSize;
   final String? posterUrl;
+  final String? customTitle;
 
   MediaItem({
     required this.id,
@@ -29,6 +30,7 @@ class MediaItem {
     required this.lastModified,
     required this.fileSize,
     this.posterUrl,
+    this.customTitle,
   });
 
   factory MediaItem.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class MediaItem {
       lastModified: DateTime.parse(json['lastModified']),
       fileSize: json['fileSize'],
       posterUrl: json['posterUrl'],
+      customTitle: json['customTitle'],
     );
   }
 
@@ -66,7 +69,32 @@ class MediaItem {
       'lastModified': lastModified.toIso8601String(),
       'fileSize': fileSize,
       'posterUrl': posterUrl,
+      'customTitle': customTitle,
     };
+  }
+
+  /// Retorna o título a ser exibido (customTitle se disponível, senão title)
+  String get displayTitle => customTitle ?? title;
+
+  /// Cria uma cópia do MediaItem com um novo título personalizado
+  MediaItem copyWithCustomTitle(String? customTitle) {
+    return MediaItem(
+      id: id,
+      title: title,
+      filePath: filePath,
+      fileName: fileName,
+      type: type,
+      seriesName: seriesName,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+      year: year,
+      quality: quality,
+      language: language,
+      lastModified: lastModified,
+      fileSize: fileSize,
+      posterUrl: posterUrl,
+      customTitle: customTitle,
+    );
   }
 
   String get fileSizeFormatted {

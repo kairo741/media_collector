@@ -4,7 +4,7 @@ description: "Controle local de arquivos de media, com foco em filme se séries.
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none'
 
-version: 0.2.2
+version: 0.3.0
 
 environment:
   sdk: ^3.8.1

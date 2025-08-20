@@ -26,13 +26,14 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       enableThumbnails: fields[6] as bool,
       thumbnailQuality: fields[7] as String,
       alternativePosterDirectory: fields[8] as String?,
+      customTitles: (fields[9] as Map?)?.cast<String, String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.selectedDirectory)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(7)
       ..write(obj.thumbnailQuality)
       ..writeByte(8)
-      ..write(obj.alternativePosterDirectory);
+      ..write(obj.alternativePosterDirectory)
+      ..writeByte(9)
+      ..write(obj.customTitles);
   }
 
   @override
