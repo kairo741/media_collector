@@ -20,7 +20,6 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
   @override
   Widget build(BuildContext context) {
     final mediaProvider = context.read<MediaProvider>();
-    final colorScheme = Theme.of(context).colorScheme;
     // Encontrar o MediaItem da série
     MediaItem? serie;
     try {
@@ -62,16 +61,6 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
           appBar: AppBar(
             title: Text(serie?.displayTitle ?? widget.seriesName),
             actionsPadding: EdgeInsets.only(right: 15),
-            actions: [
-              IconButton(
-                // TODO - Implementação temporária para gerenciamento de estado dos eps
-                icon: Icon(Icons.refresh, color: colorScheme.primary, size: 18.0),
-                onPressed: mediaProvider.isScanning ? null : () => setState(() {}),
-                tooltip: 'Atualizar',
-                style: IconButton.styleFrom(backgroundColor: colorScheme.secondary.withAlpha(40)),
-                constraints: const BoxConstraints(minWidth: 18.0, minHeight: 18.0),
-              ),
-            ],
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
@@ -86,7 +75,7 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
                 child: ExpansionTile(
                   initiallyExpanded: index == 0, // Apenas a primeira temporada expandida
                   title: Text('Temporada $season', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  children: [_EpisodesGrid(episodes: eps)],
+                  children: [_buildEpisodesGrid(eps)],
                 ),
               );
             }).toList(),
@@ -95,15 +84,8 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
       },
     );
   }
-}
 
-class _EpisodesGrid extends StatelessWidget {
-  final List<MediaItem> episodes;
-
-  const _EpisodesGrid({required this.episodes});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildEpisodesGrid(List<MediaItem> episodes) {
     return LayoutBuilder(
       builder: (context, constraints) {
         int crossAxisCount = 2;
@@ -129,107 +111,112 @@ class _EpisodesGrid extends StatelessWidget {
           ),
           itemCount: episodes.length,
           itemBuilder: (context, index) {
-            return _EpisodeCard(ep: episodes[index]);
+            return _buildEpisodeCard(episodes[index]);
           },
         );
       },
     );
   }
-}
 
-class _EpisodeCard extends StatelessWidget {
-  final MediaItem ep;
-
-  const _EpisodeCard({required this.ep});
-
-  Future<String?> _getThumbPath(BuildContext context) async {
-    final quality = context.read<MediaProvider>().thumbnailQuality;
-    return await FFmpegThumbHelper.getThumb(ep.filePath, quality);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildEpisodeCard(MediaItem ep) {
+    final isWatched = context.read<MediaProvider>().isWatched(ep);
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () => context.read<MediaProvider>().openMediaFile(ep),
-        onSecondaryTapDown: (TapDownDetails details) => _showContextMenu(context, details.globalPosition),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        onSecondaryTapDown: (TapDownDetails details) => _showContextMenu(context, details.globalPosition, ep),
+        child: Stack(
           children: [
-            AspectRatio(
-              aspectRatio: 26 / 9,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                child: FutureBuilder<String?>(
-                  future: _getThumbPath(context), // TODO - Fazer validação caso o usuário configure sem thumbs
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                    }
-                    if (snapshot.hasData && snapshot.data != null) {
-                      return Image.file(File(snapshot.data!), fit: BoxFit.cover);
-                    }
-                    return Container(
-                      color: Colors.grey[900],
-                      child: const Center(child: Icon(Icons.tv, size: 40, color: Colors.white24)),
-                    );
-                  },
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Column(
-                children: [
-                  Text(
-                    "${ep.episodeNumber != null ? '${ep.episodeNumber} | ' : ''}${ep.displayTitle}",
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  if (ep.customTitle != null && ep.title != ep.fileName)
-                    Text(
-                      ep.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600], fontStyle: FontStyle.italic),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AspectRatio(
+                  aspectRatio: 26 / 9,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                    child: FutureBuilder<String?>(
+                      future: _getThumbPath(context, ep), // TODO - Fazer validação caso o usuário configure sem thumbs
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                        }
+                        if (snapshot.hasData && snapshot.data != null) {
+                          return Image.file(File(snapshot.data!), fit: BoxFit.cover);
+                        }
+                        return Container(
+                          color: Colors.grey[900],
+                          child: const Center(child: Icon(Icons.tv, size: 40, color: Colors.white24)),
+                        );
+                      },
                     ),
-                ],
-              ),
-            ),
-            Spacer(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.play_arrow),
-                    tooltip: 'Reproduzir',
-                    onPressed: () => context.read<MediaProvider>().openMediaFile(ep),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.info_outline),
-                    tooltip: 'Informações',
-                    onPressed: () => _showFileInfo(context),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Column(
+                    children: [
+                      Text(
+                        "${ep.episodeNumber != null ? '${ep.episodeNumber} | ' : ''}${ep.displayTitle}",
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (ep.customTitle != null && ep.title != ep.fileName)
+                        Text(
+                          ep.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: Colors.grey[600], fontStyle: FontStyle.italic),
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Spacer(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.play_arrow),
+                        tooltip: 'Reproduzir',
+                        onPressed: () => context.read<MediaProvider>().openMediaFile(ep),
+                      ),
+                      IconButton(
+                        icon: Icon(isWatched ? Icons.visibility_off : Icons.visibility, size: 20),
+                        tooltip: isWatched ? 'Marcar como não assistido' : 'Marcar como assistido',
+                        onPressed: () {
+                          setState(() {
+                            final mediaProvider = context.read<MediaProvider>();
+                            final isCurrentlyWatched = mediaProvider.isWatched(ep);
+                            mediaProvider.setWatched(ep, !isCurrentlyWatched);
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+            if (isWatched) _buildWatchedFlag(),
           ],
         ),
       ),
     );
   }
 
-  void _showFileInfo(BuildContext context) {
+  Future<String?> _getThumbPath(BuildContext context, MediaItem ep) async {
+    final quality = context.read<MediaProvider>().thumbnailQuality;
+    return await FFmpegThumbHelper.getThumb(ep.filePath, quality);
+  }
+
+  void _showFileInfo(BuildContext context, MediaItem ep) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -256,6 +243,21 @@ class _EpisodeCard extends StatelessWidget {
     );
   }
 
+  Widget _buildWatchedFlag() {
+    return Positioned(
+      top: 23,
+      right: -38,
+      child: Transform.rotate(
+        angle: 0.6,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 30),
+          decoration: BoxDecoration(color: Color(0xffba1a1a), borderRadius: BorderRadius.circular(0)),
+          child: Text("Assistido", style: TextStyle(fontSize: 20, letterSpacing: 5)),
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -276,7 +278,7 @@ class _EpisodeCard extends StatelessWidget {
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  void _showContextMenu(BuildContext context, Offset position) {
+  void _showContextMenu(BuildContext context, Offset position, MediaItem ep) {
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -333,6 +335,20 @@ class _EpisodeCard extends StatelessWidget {
           ),
         ],
         PopupMenuItem(
+          value: 'watched',
+          child: Row(
+            children: [
+              Icon(
+                context.read<MediaProvider>().isWatched(ep) ? Icons.visibility_off : Icons.visibility,
+                color: context.read<MediaProvider>().isWatched(ep) ? Colors.red : Colors.green,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(context.read<MediaProvider>().isWatched(ep) ? 'Marcar como não assistido' : 'Marcar como assistido'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
           value: 'info',
           child: Row(
             children: [
@@ -353,7 +369,14 @@ class _EpisodeCard extends StatelessWidget {
             context.read<MediaProvider>().openContainingFolder(ep);
             break;
           case 'remove_custom':
-            context.read<MediaProvider>().removeCustomTitle(ep);
+            setState(() {
+              context.read<MediaProvider>().removeCustomTitle(ep);
+            });
+            break;
+          case 'watched':
+            final mediaProvider = context.read<MediaProvider>();
+            final isCurrentlyWatched = mediaProvider.isWatched(ep);
+            mediaProvider.setWatched(ep, !isCurrentlyWatched);
             break;
           case 'rename':
             final mediaProvider = context.read<MediaProvider>();
@@ -364,18 +387,22 @@ class _EpisodeCard extends StatelessWidget {
                 mediaItem: ep,
                 currentCustomTitle: currentCustomTitle,
                 onRename: (newTitle) {
-                  mediaProvider.setCustomTitle(ep, newTitle);
+                  setState(() {
+                    mediaProvider.setCustomTitle(ep, newTitle);
+                  });
                 },
                 onRemoveCustomTitle: currentCustomTitle != null
                     ? () {
-                        mediaProvider.removeCustomTitle(ep);
+                        setState(() {
+                          mediaProvider.removeCustomTitle(ep);
+                        });
                       }
                     : null,
               ),
             );
             break;
           case 'info':
-            _showFileInfo(context);
+            _showFileInfo(context, ep);
             break;
         }
       }

@@ -14,6 +14,7 @@ class MediaItem {
   final int fileSize;
   final String? posterUrl;
   final String? customTitle;
+  final bool isWatched;
 
   MediaItem({
     required this.id,
@@ -31,6 +32,7 @@ class MediaItem {
     required this.fileSize,
     this.posterUrl,
     this.customTitle,
+    this.isWatched = false,
   });
 
   factory MediaItem.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,7 @@ class MediaItem {
       fileSize: json['fileSize'],
       posterUrl: json['posterUrl'],
       customTitle: json['customTitle'],
+      isWatched: json['isWatched'] ?? false,
     );
   }
 
@@ -70,6 +73,7 @@ class MediaItem {
       'fileSize': fileSize,
       'posterUrl': posterUrl,
       'customTitle': customTitle,
+      'isWatched': isWatched,
     };
   }
 
@@ -94,6 +98,29 @@ class MediaItem {
       fileSize: fileSize,
       posterUrl: posterUrl,
       customTitle: customTitle,
+      isWatched: isWatched,
+    );
+  }
+
+  /// Cria uma cópia do MediaItem com o status de assistido alterado
+  MediaItem copyWithWatchedStatus(bool isWatched) {
+    return MediaItem(
+      id: id,
+      title: title,
+      filePath: filePath,
+      fileName: fileName,
+      type: type,
+      seriesName: seriesName,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+      year: year,
+      quality: quality,
+      language: language,
+      lastModified: lastModified,
+      fileSize: fileSize,
+      posterUrl: posterUrl,
+      customTitle: customTitle,
+      isWatched: isWatched,
     );
   }
 

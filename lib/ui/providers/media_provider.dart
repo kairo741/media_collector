@@ -17,6 +17,7 @@ class MediaProvider extends ChangeNotifier {
   String? _errorMessage;
   MediaType? _selectedFilter;
   String _searchQuery = '';
+  bool? _watchedFilter; // null = todos, true = apenas assistidos, false = apenas não assistidos
 
   // Getters
   List<MediaItem> get mediaItems => _mediaItems;
@@ -33,12 +34,18 @@ class MediaProvider extends ChangeNotifier {
 
   String get searchQuery => _searchQuery;
 
+  bool? get watchedFilter => _watchedFilter;
+
   // Estatísticas
   int get totalItems => _mediaItems.length;
 
   int get movieCount => _mediaItems.where((item) => item.type == MediaType.movie).length;
 
   int get seriesCount => _mediaItems.where((item) => item.type == MediaType.series).length;
+
+  int get watchedCount => _mediaItems.where((item) => item.isWatched).length;
+
+  int get unwatchedCount => _mediaItems.where((item) => !item.isWatched).length;
 
   int get totalSize {
     return _mediaItems.fold(0, (sum, item) => sum + item.fileSize);
@@ -135,12 +142,29 @@ class MediaProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Define o filtro de status assistido
+  void setWatchedFilter(bool? filter) {
+    _watchedFilter = filter;
+    _applyFilters();
+    notifyListeners();
+  }
+
   /// Aplica filtros e busca
   void _applyFilters() {
     _filteredItems = _mediaItems.where((item) {
       // Filtro por tipo
       if (_selectedFilter != null && item.type != _selectedFilter) {
         return false;
+      }
+
+      // Filtro por status assistido
+      if (_watchedFilter != null) {
+        if (_watchedFilter! && !item.isWatched) {
+          return false;
+        }
+        if (!_watchedFilter! && item.isWatched) {
+          return false;
+        }
       }
 
       // Filtro por busca
@@ -272,7 +296,61 @@ class MediaProvider extends ChangeNotifier {
       if (customTitle != null) {
         _mediaItems[i] = _mediaItems[i].copyWithCustomTitle(customTitle);
       }
+      
+      // Carrega status de assistido
+      final isWatched = _settingsService.isWatched(_mediaItems[i].filePath);
+      if (isWatched != _mediaItems[i].isWatched) {
+        _mediaItems[i] = _mediaItems[i].copyWithWatchedStatus(isWatched);
+      }
     }
+  }
+
+  /// Define um item como assistido
+  Future<void> setWatched(MediaItem item, bool watched) async {
+    await _settingsService.setWatched(item.filePath, watched);
+
+    // Atualiza o item na lista local
+    final index = _mediaItems.indexWhere((m) => m.id == item.id);
+    if (index != -1) {
+      _mediaItems[index] = item.copyWithWatchedStatus(watched);
+      _applyFilters();
+      notifyListeners();
+    }
+  }
+
+  /// Verifica se um item foi assistido
+  bool isWatched(MediaItem item) {
+    return _settingsService.isWatched(item.filePath);
+  }
+
+  /// Remove o status de assistido de um item
+  Future<void> removeWatched(MediaItem item) async {
+    await _settingsService.removeWatched(item.filePath);
+
+    // Atualiza o item na lista local
+    final index = _mediaItems.indexWhere((m) => m.id == item.id);
+    if (index != -1) {
+      _mediaItems[index] = item.copyWithWatchedStatus(false);
+      _applyFilters();
+      notifyListeners();
+    }
+  }
+
+  /// Limpa todos os status de assistido
+  Future<void> clearWatchedItems() async {
+    await _settingsService.clearWatchedItems();
+
+    // Atualiza todos os itens na lista local
+    for (int i = 0; i < _mediaItems.length; i++) {
+      _mediaItems[i] = _mediaItems[i].copyWithWatchedStatus(false);
+    }
+    _applyFilters();
+    notifyListeners();
+  }
+
+  /// Obtém a lista de itens assistidos
+  Set<String> getWatchedItems() {
+    return _settingsService.getWatchedItems();
   }
 
   /// Calcula o tamanho total ocupado pelas thumbnails em disco

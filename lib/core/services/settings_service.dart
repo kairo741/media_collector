@@ -246,6 +246,43 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Define um item como assistido
+  Future<void> setWatched(String filePath, bool watched) async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.setWatched(filePath, watched);
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Verifica se um item foi assistido
+  bool isWatched(String filePath) {
+    return _currentSettings?.isWatched(filePath) ?? false;
+  }
+
+  /// Remove o status de assistido de um item
+  Future<void> removeWatched(String filePath) async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.removeWatched(filePath);
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Limpa todos os status de assistido
+  Future<void> clearWatchedItems() async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.clearWatchedItems();
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Obtém a lista de itens assistidos
+  Set<String> getWatchedItems() {
+    return _currentSettings?.getWatchedItems() ?? {};
+  }
+
   /// Reseta todas as configurações
   Future<void> resetSettings() async {
     _currentSettings = UserSettings();

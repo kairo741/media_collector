@@ -34,6 +34,9 @@ class UserSettings extends HiveObject {
   @HiveField(9)
   Map<String, String> customTitles; // filePath -> customTitle
 
+  @HiveField(10)
+  List<String> watchedItems; // filePath -> watched status
+
   UserSettings({
     this.selectedDirectory,
     List<String>? recentDirectories,
@@ -45,10 +48,12 @@ class UserSettings extends HiveObject {
     this.thumbnailQuality = 'medium',
     this.alternativePosterDirectory,
     Map<String, String>? customTitles,
+    List<String>? watchedItems,
   })  : recentDirectories = recentDirectories ?? [],
         mediaMetadata = mediaMetadata ?? {},
         excludedExtensions = excludedExtensions ?? [],
-        customTitles = customTitles ?? {};
+        customTitles = customTitles ?? {},
+        watchedItems = watchedItems ?? [];
 
   // Métodos auxiliares
   void addRecentDirectory(String directory) {
@@ -102,6 +107,37 @@ class UserSettings extends HiveObject {
     customTitles.clear();
   }
 
+  /// Define um item como assistido
+  void setWatched(String filePath, bool watched) {
+    if (watched) {
+      if (!watchedItems.contains(filePath)) {
+        watchedItems.add(filePath);
+      }
+    } else {
+      watchedItems.remove(filePath);
+    }
+  }
+
+  /// Verifica se um item foi assistido
+  bool isWatched(String filePath) {
+    return watchedItems.contains(filePath);
+  }
+
+  /// Remove o status de assistido de um item
+  void removeWatched(String filePath) {
+    watchedItems.remove(filePath);
+  }
+
+  /// Limpa todos os status de assistido
+  void clearWatchedItems() {
+    watchedItems.clear();
+  }
+
+  /// Obtém a lista de itens assistidos
+  Set<String> getWatchedItems() {
+    return Set.from(watchedItems);
+  }
+
   // Cria uma cópia das configurações
   UserSettings copyWith({
     String? selectedDirectory,
@@ -114,6 +150,7 @@ class UserSettings extends HiveObject {
     String? thumbnailQuality,
     String? alternativePosterDirectory,
     Map<String, String>? customTitles,
+    List<String>? watchedItems,
   }) {
     return UserSettings(
       selectedDirectory: selectedDirectory ?? this.selectedDirectory,
@@ -126,6 +163,7 @@ class UserSettings extends HiveObject {
       thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
       alternativePosterDirectory: alternativePosterDirectory ?? this.alternativePosterDirectory,
       customTitles: customTitles ?? Map.from(this.customTitles),
+      watchedItems: watchedItems ?? List.from(this.watchedItems),
     );
   }
 } 

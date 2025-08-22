@@ -270,6 +270,12 @@ class HomeScreen extends StatelessWidget {
         _buildStatChip('Filmes: ${mediaProvider.movieCount}', Icons.movie, Colors.blue),
         const SizedBox(width: 8),
         _buildStatChip('Séries: ${mediaProvider.seriesCount}', Icons.tv, Colors.green),
+        const SizedBox(width: 4),
+        const VerticalDivider(width: 20, thickness: 1, indent: 20, endIndent: 20, color: Colors.grey),
+        const SizedBox(width: 4),
+        _buildStatChip('Assistidos: ${mediaProvider.watchedCount}', Icons.visibility, Colors.green),
+        const SizedBox(width: 8),
+        _buildStatChip('Não assistidos: ${mediaProvider.unwatchedCount}', Icons.visibility_off, Colors.orange),
       ],
     );
   }

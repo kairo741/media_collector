@@ -126,6 +126,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
               const Divider(),
               _buildCustomTitlesSettings(),
               const Divider(),
+              _buildWatchedStatusSettings(),
+              const Divider(),
               _buildExcludedExtensions(),
             ],
           ),
@@ -343,6 +345,46 @@ class _SettingsDialogState extends State<SettingsDialog> {
     }
   }
 
+  Future<void> _clearAllWatchedStatus() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Limpar Status de Assistido'),
+        content: const Text(
+          'Tem certeza que deseja remover todos os status de assistido? '
+          'Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Limpar Todos'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final mediaProvider = context.read<MediaProvider>();
+        await mediaProvider.clearWatchedItems();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Todos os status de assistido foram removidos!')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao limpar status de assistido: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _showAlternativePosterDirectoryDialog() async {
     try {
       final selectedDirectory = await FilePicker.platform.getDirectoryPath(
@@ -422,6 +464,59 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     label: const Text('Limpar Todos os Títulos Personalizados'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWatchedStatusSettings() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Status de Assistido', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        const Text(
+          'Gerencie o status de assistido dos itens de mídia:',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.visibility, size: 20, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Os status de assistido são salvos apenas no programa e não alteram os arquivos originais.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _clearAllWatchedStatus,
+                    icon: const Icon(Icons.clear_all, size: 18),
+                    label: const Text('Limpar Todos os Status de Assistido'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
                     ),
                   ),
