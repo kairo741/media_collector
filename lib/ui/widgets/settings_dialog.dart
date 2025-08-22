@@ -599,6 +599,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
     final mediaProvider = context.read<MediaProvider>();
 
     try {
+      // Verifica se as extensões excluídas foram alteradas (requer rescan completo)
+      final currentExcluded = mediaProvider.getExcludedExtensions();
+      final extensionsChanged = currentExcluded.length != _excludedExtensions.length ||
+          !currentExcluded.every((ext) => _excludedExtensions.contains(ext));
+
+      // Verifica se a pasta alternativa de posters foi alterada (requer rescan completo)
+      final currentPosterDir = mediaProvider.getAlternativePosterDirectory();
+      final posterDirectoryChanged = currentPosterDir != _alternativePosterDirectory;
+
       // Salva configurações de thumbnails
       await mediaProvider.setThumbnailSettings(
         enableThumbnails: _enableThumbnails,
@@ -612,8 +621,6 @@ class _SettingsDialogState extends State<SettingsDialog> {
       await mediaProvider.setAlternativePosterDirectory(_alternativePosterDirectory);
 
       // Salva extensões excluídas
-      final currentExcluded = mediaProvider.getExcludedExtensions();
-
       // Remove extensões que não estão mais na lista
       for (final ext in currentExcluded) {
         if (!_excludedExtensions.contains(ext)) {
@@ -625,6 +632,17 @@ class _SettingsDialogState extends State<SettingsDialog> {
       for (final ext in _excludedExtensions) {
         if (!currentExcluded.contains(ext)) {
           await mediaProvider.addExcludedExtension(ext);
+        }
+      }
+
+      // Atualiza a lista de mídia com as novas configurações
+      if (mediaProvider.selectedDirectory.isNotEmpty) {
+        if (extensionsChanged || posterDirectoryChanged) {
+          // Se as extensões ou pasta de posters foram alteradas, precisa reescanear o diretório
+          await mediaProvider.scanDirectory(mediaProvider.selectedDirectory);
+        } else {
+          // Caso contrário, apenas atualiza as configurações aplicadas
+          mediaProvider.refreshMediaItemsWithSettings();
         }
       }
 

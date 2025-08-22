@@ -305,6 +305,13 @@ class MediaProvider extends ChangeNotifier {
     }
   }
 
+  /// Atualiza as configurações aplicadas aos itens de mídia sem reescanear o diretório
+  void refreshMediaItemsWithSettings() {
+    _loadCustomTitles();
+    _applyFilters();
+    notifyListeners();
+  }
+
   /// Define um item como assistido
   Future<void> setWatched(MediaItem item, bool watched) async {
     await _settingsService.setWatched(item.filePath, watched);
