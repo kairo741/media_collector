@@ -24,7 +24,8 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
     MediaItem? serie;
     try {
       serie = mediaProvider.mediaItems.firstWhere(
-        (item) => item.type == MediaType.series && (item.seriesName ?? item.title) == widget.seriesName,
+        (item) =>
+            item.type == MediaType.series && (item.seriesName ?? item.title) == widget.seriesName,
       );
     } catch (_) {
       serie = null;
@@ -70,11 +71,22 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
               final season = seasonEntry.key;
               final eps = seasonEntry.value;
               eps.sort((a, b) => (a.episodeNumber ?? 0).compareTo(b.episodeNumber ?? 0));
+              final bool isAllWatched = eps.every(
+                (ep) => context.read<MediaProvider>().isWatched(ep),
+              );
+              final bool shouldExpand =
+                  !isAllWatched &&
+                  (index == 0
+                      ? true // Para temporada 0, só precisa que não esteja tudo assistido para sempre iniciar expandida
+                      : eps.any((ep) => context.read<MediaProvider>().isWatched(ep)));
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
                 child: ExpansionTile(
-                  initiallyExpanded: index == 0, // Apenas a primeira temporada expandida
-                  title: Text('Temporada $season', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  initiallyExpanded: shouldExpand,
+                  title: Text(
+                    'Temporada $season',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   children: [_buildEpisodesGrid(eps)],
                 ),
               );
@@ -119,95 +131,111 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
   }
 
   Widget _buildEpisodeCard(MediaItem ep) {
-    final isWatched = context.read<MediaProvider>().isWatched(ep);
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: () => context.read<MediaProvider>().openMediaFile(ep),
-        onSecondaryTapDown: (TapDownDetails details) => _showContextMenu(context, details.globalPosition, ep),
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    return StatefulBuilder(
+      builder: (context, cardState) {
+        final isWatched = context.read<MediaProvider>().isWatched(ep);
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => context.read<MediaProvider>().openMediaFile(ep),
+            onSecondaryTapDown: (TapDownDetails details) =>
+                _showContextMenu(context, details.globalPosition, ep),
+            child: Stack(
               children: [
-                AspectRatio(
-                  aspectRatio: 26 / 9,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                    child: FutureBuilder<String?>(
-                      future: _getThumbPath(context, ep), // TODO - Fazer validação caso o usuário configure sem thumbs
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                        }
-                        if (snapshot.hasData && snapshot.data != null) {
-                          return Image.file(File(snapshot.data!), fit: BoxFit.cover);
-                        }
-                        return Container(
-                          color: Colors.grey[900],
-                          child: const Center(child: Icon(Icons.tv, size: 40, color: Colors.white24)),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Column(
-                    children: [
-                      Text(
-                        "${ep.episodeNumber != null ? '${ep.episodeNumber} | ' : ''}${ep.displayTitle}",
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      if (ep.customTitle != null && ep.title != ep.fileName)
-                        Text(
-                          ep.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.copyWith(color: Colors.grey[600], fontStyle: FontStyle.italic),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: 26 / 9,
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                        child: FutureBuilder<String?>(
+                          future: _getThumbPath(context, ep),
+                          // TODO - Fazer validação caso o usuário configure sem thumbs
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                            }
+                            if (snapshot.hasData && snapshot.data != null) {
+                              return Image.file(File(snapshot.data!), fit: BoxFit.cover);
+                            }
+                            return Container(
+                              color: Colors.grey[900],
+                              child: const Center(
+                                child: Icon(Icons.tv, size: 40, color: Colors.white24),
+                              ),
+                            );
+                          },
                         ),
-                    ],
-                  ),
-                ),
-                Spacer(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.play_arrow),
-                        tooltip: 'Reproduzir',
-                        onPressed: () => context.read<MediaProvider>().openMediaFile(ep),
                       ),
-                      IconButton(
-                        icon: Icon(isWatched ? Icons.visibility_off : Icons.visibility, size: 20),
-                        tooltip: isWatched ? 'Marcar como não assistido' : 'Marcar como assistido',
-                        onPressed: () {
-                          setState(() {
-                            final mediaProvider = context.read<MediaProvider>();
-                            final isCurrentlyWatched = mediaProvider.isWatched(ep);
-                            mediaProvider.setWatched(ep, !isCurrentlyWatched);
-                          });
-                        },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      child: Column(
+                        children: [
+                          Text(
+                            "${ep.episodeNumber != null ? '${ep.episodeNumber} | ' : ''}${ep.displayTitle}",
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          if (ep.customTitle != null && ep.title != ep.fileName)
+                            Text(
+                              ep.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    Spacer(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.play_arrow),
+                            tooltip: 'Reproduzir',
+                            onPressed: () => context.read<MediaProvider>().openMediaFile(ep),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              isWatched ? Icons.visibility_off : Icons.visibility,
+                              size: 20,
+                            ),
+                            tooltip: isWatched
+                                ? 'Marcar como não assistido'
+                                : 'Marcar como assistido',
+                            onPressed: () {
+                              cardState(() {
+                                final mediaProvider = context.read<MediaProvider>();
+                                final isCurrentlyWatched = mediaProvider.isWatched(ep);
+                                mediaProvider.setWatched(ep, !isCurrentlyWatched);
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+                if (isWatched) _buildWatchedFlag(),
               ],
             ),
-            if (isWatched) _buildWatchedFlag(),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -251,7 +279,10 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
         angle: 0.6,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 30),
-          decoration: BoxDecoration(color: Color(0xffba1a1a), borderRadius: BorderRadius.circular(0)),
+          decoration: BoxDecoration(
+            color: Color(0xffba1a1a),
+            borderRadius: BorderRadius.circular(0),
+          ),
           child: Text("Assistido", style: TextStyle(fontSize: 20, letterSpacing: 5)),
         ),
       ),
@@ -313,12 +344,20 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
           child: Row(
             children: [
               Icon(
-                context.read<MediaProvider>().getCustomTitle(ep) != null ? Icons.edit : Icons.edit_outlined,
-                color: context.read<MediaProvider>().getCustomTitle(ep) != null ? Colors.orange : Colors.grey,
+                context.read<MediaProvider>().getCustomTitle(ep) != null
+                    ? Icons.edit
+                    : Icons.edit_outlined,
+                color: context.read<MediaProvider>().getCustomTitle(ep) != null
+                    ? Colors.orange
+                    : Colors.grey,
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(context.read<MediaProvider>().getCustomTitle(ep) != null ? 'Editar título' : 'Renomear'),
+              Text(
+                context.read<MediaProvider>().getCustomTitle(ep) != null
+                    ? 'Editar título'
+                    : 'Renomear',
+              ),
             ],
           ),
         ),
@@ -339,12 +378,18 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
           child: Row(
             children: [
               Icon(
-                context.read<MediaProvider>().isWatched(ep) ? Icons.visibility_off : Icons.visibility,
+                context.read<MediaProvider>().isWatched(ep)
+                    ? Icons.visibility_off
+                    : Icons.visibility,
                 color: context.read<MediaProvider>().isWatched(ep) ? Colors.red : Colors.green,
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(context.read<MediaProvider>().isWatched(ep) ? 'Marcar como não assistido' : 'Marcar como assistido'),
+              Text(
+                context.read<MediaProvider>().isWatched(ep)
+                    ? 'Marcar como não assistido'
+                    : 'Marcar como assistido',
+              ),
             ],
           ),
         ),
