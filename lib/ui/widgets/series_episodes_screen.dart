@@ -52,12 +52,8 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
           );
         }
         final episodes = snapshot.data!;
-        // Agrupar por temporada
-        final Map<String, List<MediaItem>> bySeason = {};
-        for (final ep in episodes) {
-          final season = ep.seasonNumber ?? '1';
-          bySeason.putIfAbsent(season, () => []).add(ep);
-        }
+        final seasonMap = _groupEpisodesBySeason(episodes);
+        final sortedSeasons = _sortSeasonEntries(seasonMap);
         return Scaffold(
           appBar: AppBar(
             title: Text(serie?.displayTitle ?? widget.seriesName),
@@ -65,7 +61,7 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
           ),
           body: ListView(
             padding: const EdgeInsets.all(16),
-            children: bySeason.entries.toList().asMap().entries.map((entry) {
+            children: sortedSeasons.asMap().entries.map((entry) {
               final index = entry.key;
               final seasonEntry = entry.value;
               final season = seasonEntry.key;
@@ -128,6 +124,39 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
         );
       },
     );
+  }
+
+  Map<String, List<MediaItem>> _groupEpisodesBySeason(List<MediaItem> episodes) {
+    final Map<String, List<MediaItem>> grouped = {};
+    for (final ep in episodes) {
+      final seasonLabel = ep.seasonNumber ?? 'Temporada 1';
+      grouped.putIfAbsent(seasonLabel, () => []).add(ep);
+    }
+    return grouped;
+  }
+
+  List<MapEntry<String, List<MediaItem>>> _sortSeasonEntries(Map<String, List<MediaItem>> seasonMap) {
+    final entries = seasonMap.entries.toList();
+    entries.sort((a, b) {
+      final numA = _parseSeasonNumber(a.key);
+      final numB = _parseSeasonNumber(b.key);
+      if (numA != null && numB != null) {
+        return numA.compareTo(numB);
+      }
+      if (numA != null) return -1;
+      if (numB != null) return 1;
+      return a.key.compareTo(b.key);
+    });
+    return entries;
+  }
+
+  int? _parseSeasonNumber(String label) {
+    final match = RegExp(r'Temporada\s*(\d{1,2})', caseSensitive: false).firstMatch(label);
+    if (match != null) {
+      return int.tryParse(match.group(1)!);
+    }
+    final fallback = RegExp(r'\b(\d{1,2})\b').firstMatch(label);
+    return fallback != null ? int.tryParse(fallback.group(1)!) : null;
   }
 
   Widget _buildEpisodeCard(MediaItem ep) {

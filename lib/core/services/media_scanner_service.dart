@@ -60,8 +60,8 @@ class MediaScannerService {
             seasonNumber: info.seasonNumber,
             episodeNumber: info.episodeNumber,
             year: null,
-            quality: null,
-            language: null,
+            quality: info.quality,
+            language: info.language,
             lastModified: await entity.lastModified(),
             fileSize: await entity.length(),
             customTitle: customTitle,
@@ -113,7 +113,14 @@ class MediaScannerService {
     final derivedTitle = _deriveEpisodeTitleFromFileName(fileName);
     final title = derivedTitle.isNotEmpty ? derivedTitle : fileName;
     final derivedSeason = _deriveSeasonLabel(parentDir, fileName);
-    return _EpisodeInfo(title: title, seasonNumber: derivedSeason, episodeNumber: episodeNumber);
+    final qualityLang = _detectQualityAndLanguage(fileName);
+    return _EpisodeInfo(
+      title: title,
+      seasonNumber: derivedSeason,
+      episodeNumber: episodeNumber,
+      quality: qualityLang.quality,
+      language: qualityLang.language,
+    );
   }
 
   Future<void> _scanDirectory(Directory directory, List<MediaItem> mediaItems) async {
@@ -182,16 +189,15 @@ class MediaScannerService {
 
     final mediaType = contentList.length > 1 ? MediaType.series : MediaType.movie;
 
+    final qualityLang = _detectQualityAndLanguage(fileName);
     // Tentar extrair informações do nome do arquivo
     final MediaInfo mediaInfo = MediaInfo(
       title: fileName.replaceAll(".", " "),
       type: MediaType.series,
       seriesName: fileName,
-      seasonNumber: "1",
       episodeNumber: 1,
-      quality: "match.group(4)",
-      // TODO
-      language: "match.group(5)", // TODO
+      quality: qualityLang.quality,
+      language: qualityLang.language,
     );
 
     return MediaItem(
@@ -201,11 +207,10 @@ class MediaScannerService {
       fileName: fileName,
       type: mediaType,
       seriesName: mediaInfo.seriesName,
-      seasonNumber: mediaInfo.seasonNumber,
       episodeNumber: mediaInfo.episodeNumber,
       year: mediaInfo.year,
-      quality: mediaInfo.quality,
-      language: mediaInfo.language,
+      quality: mediaInfo.quality ?? qualityLang.quality,
+      language: mediaInfo.language ?? qualityLang.language,
       lastModified: DateTime.now(),
       fileSize: 10,
       posterUrl: localPosterPath[0].isEmpty
@@ -290,6 +295,7 @@ class MediaScannerService {
   }
 
   MediaInfo _extractMediaInfo(String fileName, MediaType type) {
+    final qualityLang = _detectQualityAndLanguage(fileName);
     // Padrões comuns para nomes de arquivos de mídia
     final patterns = [
       // Série: Nome.S01E02.Qualidade.Idioma
@@ -313,8 +319,8 @@ class MediaScannerService {
             seriesName: match.group(1)!.trim(),
             seasonNumber: match.group(2),
             episodeNumber: int.tryParse(match.group(3)!),
-            quality: match.group(4),
-            language: match.group(5),
+            quality: match.group(4) ?? qualityLang.quality,
+            language: match.group(5) ?? qualityLang.language,
           );
         } else if (match.groupCount >= 2) {
           // Padrão de filme
@@ -322,15 +328,20 @@ class MediaScannerService {
             title: match.group(1)!.trim().replaceAll(".", " "),
             type: type,
             year: match.group(2),
-            quality: match.group(3),
-            language: match.group(4),
+            quality: match.group(3) ?? qualityLang.quality,
+            language: match.group(4) ?? qualityLang.language,
           );
         }
       }
     }
 
     // Fallback: tratar como filme com nome simples
-    return MediaInfo(title: fileName.trim(), type: type);
+    return MediaInfo(
+      title: fileName.trim(),
+      type: type,
+      quality: qualityLang.quality,
+      language: qualityLang.language,
+    );
   }
 
   String _generateId(String filePath) {
@@ -343,8 +354,23 @@ class _EpisodeInfo {
   final String title;
   final String? seasonNumber;
   final int? episodeNumber;
+  final String? quality;
+  final String? language;
 
-  _EpisodeInfo({required this.title, this.seasonNumber, this.episodeNumber});
+  _EpisodeInfo({
+    required this.title,
+    this.seasonNumber,
+    this.episodeNumber,
+    this.quality,
+    this.language,
+  });
+}
+
+class QualityLanguage {
+  final String? quality;
+  final String? language;
+
+  const QualityLanguage({this.quality, this.language});
 }
 
 class MediaInfo {
@@ -497,4 +523,84 @@ List<String> _collectSeasonExtras(String source) {
     }
   }
   return extras;
+}
+
+const List<String> _qualityKeywords = [
+  '1080p',
+  '2160p',
+  '720p',
+  '480p',
+  '4k',
+  '8k',
+  'hdr10+',
+  'hdr10',
+  'hdr',
+  'uhd',
+  'bluray',
+  'web-dl',
+  'webdl',
+  'web-rip',
+  'webrip',
+  'bdrip',
+  'brip',
+  'hdtv',
+  'remux',
+  'x264',
+  'x265',
+  'xvid',
+  'hevc',
+  'dual x264',
+  'dual x265',
+  'dual',
+  'hdcam',
+  'cam',
+  'ts',
+  'dvdrip',
+  'truehd',
+  'ddp5.1',
+  'dd5.1',
+  'dd2.0',
+  'atmos',
+  'dts',
+];
+
+const List<String> _languageKeywords = [
+  'pt-br',
+  'ptbr',
+  'portuguese',
+  'es',
+  'eng',
+  'en',
+  'english',
+  'spanish',
+  'dual audio',
+  'dual',
+  'dublado',
+  'dubbed',
+  'subtitled',
+];
+
+/// Detecta qualidade e idioma com base em palavras-chave comuns no nome do arquivo.
+QualityLanguage _detectQualityAndLanguage(String fileName) {
+  final normalized = fileName.replaceAll(RegExp(r'[._]+'), ' ').toLowerCase();
+  String? quality;
+  String? language;
+
+  for (final keyword in _qualityKeywords) {
+    final pattern = RegExp(r'\b' + RegExp.escape(keyword) + r'\b', caseSensitive: false);
+    if (pattern.hasMatch(normalized)) {
+      quality = keyword.toUpperCase();
+      break;
+    }
+  }
+
+  for (final keyword in _languageKeywords) {
+    final pattern = RegExp(r'\b' + RegExp.escape(keyword) + r'\b', caseSensitive: false);
+    if (pattern.hasMatch(normalized)) {
+      language = keyword.toUpperCase();
+      break;
+    }
+  }
+
+  return QualityLanguage(quality: quality, language: language);
 }
