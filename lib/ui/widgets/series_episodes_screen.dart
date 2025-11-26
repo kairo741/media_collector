@@ -84,7 +84,7 @@ class _SeriesEpisodesScreenState extends State<SeriesEpisodesScreen> {
                 child: ExpansionTile(
                   initiallyExpanded: shouldExpand,
                   title: Text(
-                    'Temporada $season',
+                    season,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   children: [_buildEpisodesGrid(eps)],

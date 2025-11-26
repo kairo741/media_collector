@@ -64,7 +64,7 @@ class MediaScannerService {
             language: null,
             lastModified: await entity.lastModified(),
             fileSize: await entity.length(),
-             customTitle: customTitle
+            customTitle: customTitle,
           ),
         );
       }
@@ -112,7 +112,8 @@ class MediaScannerService {
 
     final derivedTitle = _deriveEpisodeTitleFromFileName(fileName);
     final title = derivedTitle.isNotEmpty ? derivedTitle : fileName;
-    return _EpisodeInfo(title: title, seasonNumber: parentDir, episodeNumber: episodeNumber);
+    final derivedSeason = _deriveSeasonLabel(parentDir, fileName);
+    return _EpisodeInfo(title: title, seasonNumber: derivedSeason, episodeNumber: episodeNumber);
   }
 
   Future<void> _scanDirectory(Directory directory, List<MediaItem> mediaItems) async {
@@ -207,11 +208,17 @@ class MediaScannerService {
       language: mediaInfo.language,
       lastModified: DateTime.now(),
       fileSize: 10,
-      posterUrl: localPosterPath[0].isEmpty ? _getLocalPoster(dir.path, fileName) : localPosterPath[0],
+      posterUrl: localPosterPath[0].isEmpty
+          ? _getLocalPoster(dir.path, fileName)
+          : localPosterPath[0],
     );
   }
 
-  Future<void> _hasMediaContent(Directory directory, List<String> contentList, List<String> localPosterPath) async {
+  Future<void> _hasMediaContent(
+    Directory directory,
+    List<String> contentList,
+    List<String> localPosterPath,
+  ) async {
     await for (final FileSystemEntity entity in directory.list(recursive: true)) {
       if (entity is File) {
         final String extension = path.extension(entity.path).toLowerCase();
@@ -365,46 +372,129 @@ class MediaInfo {
 /// Tenta derivar o título real do episódio a partir do nome do arquivo, ignorando padrões como
 /// SxxExx, 1x02, TxxExx e removendo indicadores de qualidade/resolução.
 String _deriveEpisodeTitleFromFileName(String fileName) {
-    final sanitized = fileName.replaceAll(RegExp(r'[._]+'), ' ').trim();
-    final patterns = [
-      RegExp(r'[Ss](\d{1,2})[Ee](\d{1,2})', caseSensitive: false),
-      RegExp(r'(\d{1,2})x(\d{1,2})', caseSensitive: false),
-      RegExp(r'[Tt](\d{1,2})[Ee](\d{1,2})', caseSensitive: false),
-    ];
+  final sanitized = fileName.replaceAll(RegExp(r'[._]+'), ' ').trim();
+  final patterns = [
+    RegExp(r'[Ss](\d{1,2})[Ee](\d{1,2})', caseSensitive: false),
+    RegExp(r'(\d{1,2})x(\d{1,2})', caseSensitive: false),
+    RegExp(r'[Tt](\d{1,2})[Ee](\d{1,2})', caseSensitive: false),
+  ];
 
-    for (final pattern in patterns) {
-      final match = pattern.firstMatch(sanitized);
-      if (match != null) {
-        final tail = sanitized.substring(match.end).replaceFirst(RegExp(r'^[\s:._-]+'), '');
-        final cleaned = _cleanEpisodeTitle(tail);
-        if (cleaned.isNotEmpty) {
-          return cleaned;
-        }
+  for (final pattern in patterns) {
+    final match = pattern.firstMatch(sanitized);
+    if (match != null) {
+      final tail = sanitized.substring(match.end).replaceFirst(RegExp(r'^[\s:._-]+'), '');
+      final cleaned = _cleanEpisodeTitle(tail);
+      if (cleaned.isNotEmpty) {
+        return cleaned;
       }
     }
-
-    var fallback = sanitized
-        .replaceAll(RegExp(r'[Ss](\d{1,2})[Ee](\d{1,2})', caseSensitive: false), '')
-        .replaceAll(RegExp(r'(\d{1,2})x(\d{1,2})', caseSensitive: false), '')
-        .replaceAll(RegExp(r'[Tt](\d{1,2})[Ee](\d{1,2})', caseSensitive: false), '')
-        .trim();
-
-    final cleanedFallback = _cleanEpisodeTitle(fallback);
-    if (cleanedFallback.isNotEmpty) {
-      return cleanedFallback;
-    }
-
-    return _cleanEpisodeTitle(sanitized);
   }
+
+  var fallback = sanitized
+      .replaceAll(RegExp(r'[Ss](\d{1,2})[Ee](\d{1,2})', caseSensitive: false), '')
+      .replaceAll(RegExp(r'(\d{1,2})x(\d{1,2})', caseSensitive: false), '')
+      .replaceAll(RegExp(r'[Tt](\d{1,2})[Ee](\d{1,2})', caseSensitive: false), '')
+      .trim();
+
+  final cleanedFallback = _cleanEpisodeTitle(fallback);
+  if (cleanedFallback.isNotEmpty) {
+    return cleanedFallback;
+  }
+
+  return _cleanEpisodeTitle(sanitized);
+}
 
 /// Remove palavras-chave de release e excesso de pontuação para deixar apenas o título limpo.
 String _cleanEpisodeTitle(String rawTitle) {
-    var cleaned = rawTitle.replaceAll(RegExp(r'[._]+'), ' ').trim();
-    final extraneous = RegExp(
-      r'[\s:._-]*(imax|web[-_. ]?dl|web[-_. ]?rip|web|dl|hdtv|bluray|bdrip|brip|hdrip|remux|proper|repack|extended|directors cut|dual(?:[- ]?audio)?|dub(?:bed)?|sub(?:bed)?|x264|x265|xvid|hevc|hdr10\+?|hdr10|hdr|uhd|2160p|1080p|720p|480p|4k|8k|dts|ac3|truehd|ddp5\.1|dd5\.1|dd2\.0|atmos|lossless|clean|limited)\b.*',
-      caseSensitive: false,
-    );
-    cleaned = cleaned.replaceAll(extraneous, '').trim();
-    cleaned = cleaned.replaceAll(RegExp(r'\s{2,}'), ' ');
-    return cleaned;
+  var cleaned = rawTitle.replaceAll(RegExp(r'[._]+'), ' ').trim();
+  final extraneous = RegExp(
+    r'[\s:._-]*(imax|web[-_. ]?dl|web[-_. ]?rip|web|dl|hdtv|bluray|bdrip|brip|hdrip|remux|proper|repack|extended|directors cut|dual(?:[- ]?audio)?|dub(?:bed)?|sub(?:bed)?|x264|x265|xvid|hevc|hdr10\+?|hdr10|hdr|uhd|2160p|1080p|720p|480p|4k|8k|dts|ac3|truehd|ddp5\.1|dd5\.1|dd2\.0|atmos|lossless|clean|limited)\b.*',
+    caseSensitive: false,
+  );
+  cleaned = cleaned.replaceAll(extraneous, '').trim();
+  cleaned = cleaned.replaceAll(RegExp(r'\s{2,}'), ' ');
+  return cleaned;
+}
+
+final _seasonReleasePattern = RegExp(
+  r'[\s:._-]*(?:web[-_. ]?dl|web[-_. ]?rip|webrip|webdl|bdrip|brip|bluray|hdrip|remux|proper|repack|extended|directors cut|limited|cam(?:rip)?|ts|telesync|dvdrip|dvd(?:rip)?|hdcam|uncut)\b',
+  caseSensitive: false,
+);
+
+final List<RegExp> _seasonExtrasPatterns = [
+  RegExp(r'\b\d{3,4}p\b', caseSensitive: false),
+  RegExp(r'\bdual(?:x\d+)?\b', caseSensitive: false),
+  RegExp(r'\bx(?:264|265)\b', caseSensitive: false),
+  RegExp(r'\bhevc\b', caseSensitive: false),
+  RegExp(r'\bhdr10\+?\b', caseSensitive: false),
+  RegExp(r'\bhdr10\b', caseSensitive: false),
+  RegExp(r'\bhdr\b', caseSensitive: false),
+  RegExp(r'\buhd\b', caseSensitive: false),
+];
+
+/// Normaliza a label de temporada removendo releases e adicionando tokens relevantes
+/// de qualidade (ex: 1080p, DUALx264) para exibição na tela.
+String _deriveSeasonLabel(String parentDir, String fileName) {
+  final seasonNumber = _extractSeasonNumber(parentDir) ?? _extractSeasonNumber(fileName);
+  final extras = _collectSeasonExtras('$parentDir $fileName');
+  final baseFallback = _cleanSeasonBase(parentDir);
+  final labelBase = seasonNumber != null
+      ? 'Temporada $seasonNumber'
+      : baseFallback.isNotEmpty
+      ? baseFallback
+      : parentDir.trim().isNotEmpty
+      ? parentDir.trim()
+      : 'Temporada';
+  if (extras.isEmpty) {
+    return labelBase;
   }
+  return '$labelBase ${extras.map((extra) => '[$extra]').join(' ')}';
+}
+
+String _cleanSeasonBase(String value) {
+  final cleaned = value.replaceAll(_seasonReleasePattern, '').trim();
+  return cleaned.isNotEmpty ? cleaned : value.trim();
+}
+
+String? _extractSeasonNumber(String text) {
+  if (text.isEmpty) return null;
+  final normalized = text.replaceAll(RegExp(r'[._]+'), ' ');
+  final patterns = [
+    RegExp(r'[Ss]eason[\s-]*(\d{1,2})', caseSensitive: false),
+    RegExp(r'[Ss](\d{1,2})\b', caseSensitive: false),
+    RegExp(r'\b(\d{1,2})x', caseSensitive: false),
+    RegExp(r'[Tt](\d{1,2})[Ee]', caseSensitive: false),
+  ];
+
+  for (final pattern in patterns) {
+    final match = pattern.firstMatch(normalized);
+    if (match != null && match.groupCount >= 1) {
+      final value = match.group(1);
+      if (value != null && value.isNotEmpty) {
+        final parsed = int.tryParse(value);
+        if (parsed != null) {
+          return parsed.toString();
+        }
+        return value;
+      }
+    }
+  }
+  return null;
+}
+
+List<String> _collectSeasonExtras(String source) {
+  final extras = <String>[];
+  final seen = <String>{};
+  final normalized = source.replaceAll(RegExp(r'[._]+'), ' ');
+  for (final pattern in _seasonExtrasPatterns) {
+    for (final match in pattern.allMatches(normalized)) {
+      final token = match.group(0)?.trim();
+      if (token == null || token.isEmpty) continue;
+      final canonical = token.toLowerCase();
+      if (seen.contains(canonical)) continue;
+      seen.add(canonical);
+      extras.add(token);
+    }
+  }
+  return extras;
+}
