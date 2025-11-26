@@ -74,68 +74,45 @@ class MediaScannerService {
 
   /// Extrai informações de temporada e episódio do nome do arquivo
   _EpisodeInfo _extractEpisodeInfo(String fileName, String filePath) {
-    // Obter o nome da pasta pai para usar como temporada
     final parentDir = path.basename(path.dirname(filePath));
-
-    // Padrões para identificar temporada e episódio
     final patterns = [
-      // S1E01 - O Garoto No Iceberg.mkv
       RegExp(r'^(.+?)[ ._-]*S(\d{1,2})E(\d{1,2})[ ._-]*(.+)?$', caseSensitive: false),
-      // 01 Bem-Vindo a Cidade da República 02 Uma Folha no Vento.mkv
       RegExp(r'^(\d{1,2})[ ._-]+(.+?)[ ._-]+(\d{1,2})[ ._-]+(.+)$', caseSensitive: false),
-      // iCarly.S01E01.1080p.Dual.mkv
       RegExp(r'^(.+?)\.S(\d{1,2})E(\d{1,2})\.(.+)$', caseSensitive: false),
-      // A.Concierge.Pokemon.S01E02.1080p.WEB-DL.DUAL.5.1.mkv
       RegExp(r'^(.+?)\.S(\d{1,2})E(\d{1,2})\.(.+)$', caseSensitive: false),
-      // Padrões alternativos
       RegExp(r'^(.+?)[ ._-]+(\d{1,2})x(\d{1,2})', caseSensitive: false),
       RegExp(r'^(.+?)[ ._-]+T(\d{1,2})E(\d{1,2})', caseSensitive: false),
-      // Padrão para apenas número do episódio no início
       RegExp(r'^(\d{1,2})[ ._-]+(.+)$', caseSensitive: false),
     ];
 
+    int? episodeNumber;
     for (int i = 0; i < patterns.length; i++) {
-      final pattern = patterns[i];
-      final match = pattern.firstMatch(fileName);
+      final match = patterns[i].firstMatch(fileName);
       if (match != null) {
-        String title;
-        int? episodeNumber;
-
         switch (i) {
-          // TODO - Melhorar com mais casos de matches (pensar em um json ou dados em banco)
-          case 0: // S1E01 - O Garoto No Iceberg.mkv
-            title = match.group(1)?.replaceAll('.', ' ').trim() ?? fileName;
+          case 0:
+          case 2:
+          case 3:
             episodeNumber = int.tryParse(match.group(3) ?? '');
             break;
-          case 1: // 01 Bem-Vindo a Cidade da República 02 Uma Folha no Vento.mkv
-            title = '${match.group(2)?.trim()} ${match.group(4)?.trim()}'.trim();
+          case 1:
             episodeNumber = int.tryParse(match.group(1) ?? '');
             break;
-          case 2: // iCarly.S01E01.1080p.Dual.mkv
-          case 3: // A.Concierge.Pokemon.S01E02.1080p.WEB-DL.DUAL.5.1.mkv
-            title = match.group(1)?.replaceAll('.', ' ').trim() ?? fileName;
+          case 4:
+          case 5:
             episodeNumber = int.tryParse(match.group(3) ?? '');
             break;
-          case 4: // Padrão 1x02
-          case 5: // Padrão T01E02
-            title = match.group(1)?.replaceAll('.', ' ').trim() ?? fileName;
-            episodeNumber = int.tryParse(match.group(3) ?? '');
-            break;
-          case 6: // Apenas número do episódio no início
-            title = match.group(2)?.trim() ?? fileName;
+          case 6:
             episodeNumber = int.tryParse(match.group(1) ?? '');
             break;
-          default:
-            title = fileName;
-            episodeNumber = null;
         }
-
-        return _EpisodeInfo(title: title, seasonNumber: parentDir, episodeNumber: episodeNumber);
+        break;
       }
     }
 
-    // Fallback: usar nome da pasta pai como temporada e filename como título
-    return _EpisodeInfo(title: fileName, seasonNumber: parentDir, episodeNumber: null);
+    final derivedTitle = _deriveEpisodeTitleFromFileName(fileName);
+    final title = derivedTitle.isNotEmpty ? derivedTitle : fileName;
+    return _EpisodeInfo(title: title, seasonNumber: parentDir, episodeNumber: episodeNumber);
   }
 
   Future<void> _scanDirectory(Directory directory, List<MediaItem> mediaItems) async {
@@ -384,3 +361,50 @@ class MediaInfo {
     this.language,
   });
 }
+
+/// Tenta derivar o título real do episódio a partir do nome do arquivo, ignorando padrões como
+/// SxxExx, 1x02, TxxExx e removendo indicadores de qualidade/resolução.
+String _deriveEpisodeTitleFromFileName(String fileName) {
+    final sanitized = fileName.replaceAll(RegExp(r'[._]+'), ' ').trim();
+    final patterns = [
+      RegExp(r'[Ss](\d{1,2})[Ee](\d{1,2})', caseSensitive: false),
+      RegExp(r'(\d{1,2})x(\d{1,2})', caseSensitive: false),
+      RegExp(r'[Tt](\d{1,2})[Ee](\d{1,2})', caseSensitive: false),
+    ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(sanitized);
+      if (match != null) {
+        final tail = sanitized.substring(match.end).replaceFirst(RegExp(r'^[\s:._-]+'), '');
+        final cleaned = _cleanEpisodeTitle(tail);
+        if (cleaned.isNotEmpty) {
+          return cleaned;
+        }
+      }
+    }
+
+    var fallback = sanitized
+        .replaceAll(RegExp(r'[Ss](\d{1,2})[Ee](\d{1,2})', caseSensitive: false), '')
+        .replaceAll(RegExp(r'(\d{1,2})x(\d{1,2})', caseSensitive: false), '')
+        .replaceAll(RegExp(r'[Tt](\d{1,2})[Ee](\d{1,2})', caseSensitive: false), '')
+        .trim();
+
+    final cleanedFallback = _cleanEpisodeTitle(fallback);
+    if (cleanedFallback.isNotEmpty) {
+      return cleanedFallback;
+    }
+
+    return _cleanEpisodeTitle(sanitized);
+  }
+
+/// Remove palavras-chave de release e excesso de pontuação para deixar apenas o título limpo.
+String _cleanEpisodeTitle(String rawTitle) {
+    var cleaned = rawTitle.replaceAll(RegExp(r'[._]+'), ' ').trim();
+    final extraneous = RegExp(
+      r'[\s:._-]*(imax|web[-_. ]?dl|web[-_. ]?rip|web|dl|hdtv|bluray|bdrip|brip|hdrip|remux|proper|repack|extended|directors cut|dual(?:[- ]?audio)?|dub(?:bed)?|sub(?:bed)?|x264|x265|xvid|hevc|hdr10\+?|hdr10|hdr|uhd|2160p|1080p|720p|480p|4k|8k|dts|ac3|truehd|ddp5\.1|dd5\.1|dd2\.0|atmos|lossless|clean|limited)\b.*',
+      caseSensitive: false,
+    );
+    cleaned = cleaned.replaceAll(extraneous, '').trim();
+    cleaned = cleaned.replaceAll(RegExp(r'\s{2,}'), ' ');
+    return cleaned;
+  }
