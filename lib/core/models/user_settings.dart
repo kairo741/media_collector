@@ -37,6 +37,12 @@ class UserSettings extends HiveObject {
   @HiveField(10)
   List<String> watchedItems; // filePath -> watched status
 
+  @HiveField(11, defaultValue: [])
+  List<String> recentlyOpenedMedia; // Lista de filePaths das mídias abertas recentemente
+
+  @HiveField(12, defaultValue: true)
+  bool showRecentSection; // Controla se a seção de recentes é exibida
+
   UserSettings({
     this.selectedDirectory,
     List<String>? recentDirectories,
@@ -49,22 +55,25 @@ class UserSettings extends HiveObject {
     this.alternativePosterDirectory,
     Map<String, String>? customTitles,
     List<String>? watchedItems,
-  })  : recentDirectories = recentDirectories ?? [],
-        mediaMetadata = mediaMetadata ?? {},
-        excludedExtensions = excludedExtensions ?? [],
-        customTitles = customTitles ?? {},
-        watchedItems = watchedItems ?? [];
+    List<String>? recentlyOpenedMedia,
+    this.showRecentSection = true,
+  }) : recentDirectories = recentDirectories ?? [],
+       mediaMetadata = mediaMetadata ?? {},
+       excludedExtensions = excludedExtensions ?? [],
+       customTitles = customTitles ?? {},
+       watchedItems = watchedItems ?? [],
+       recentlyOpenedMedia = recentlyOpenedMedia ?? [];
 
   // Métodos auxiliares
   void addRecentDirectory(String directory) {
     if (directory.isEmpty) return;
-    
+
     // Remove se já existe
     recentDirectories.remove(directory);
-    
+
     // Adiciona no início
     recentDirectories.insert(0, directory);
-    
+
     // Mantém apenas os mais recentes
     if (recentDirectories.length > maxRecentDirectories) {
       recentDirectories = recentDirectories.take(maxRecentDirectories).toList();
@@ -138,6 +147,37 @@ class UserSettings extends HiveObject {
     return Set.from(watchedItems);
   }
 
+  /// Adiciona uma mídia à lista de recentes
+  void addRecentlyOpenedMedia(String filePath) {
+    if (filePath.isEmpty) return;
+
+    // Remove se já existe
+    recentlyOpenedMedia.remove(filePath);
+
+    // Adiciona no início (mais recente primeiro)
+    recentlyOpenedMedia.insert(0, filePath);
+
+    // Mantém apenas os últimos 10 itens
+    if (recentlyOpenedMedia.length > 10) {
+      recentlyOpenedMedia = recentlyOpenedMedia.take(10).toList();
+    }
+  }
+
+  /// Obtém a lista de mídias abertas recentemente
+  List<String> getRecentlyOpenedMedia() {
+    return List.from(recentlyOpenedMedia);
+  }
+
+  /// Remove uma mídia da lista de recentes
+  void removeRecentlyOpenedMedia(String filePath) {
+    recentlyOpenedMedia.remove(filePath);
+  }
+
+  /// Limpa todas as mídias recentes
+  void clearRecentlyOpenedMedia() {
+    recentlyOpenedMedia.clear();
+  }
+
   // Cria uma cópia das configurações
   UserSettings copyWith({
     String? selectedDirectory,
@@ -151,6 +191,8 @@ class UserSettings extends HiveObject {
     String? alternativePosterDirectory,
     Map<String, String>? customTitles,
     List<String>? watchedItems,
+    List<String>? recentlyOpenedMedia,
+    bool? showRecentSection,
   }) {
     return UserSettings(
       selectedDirectory: selectedDirectory ?? this.selectedDirectory,
@@ -164,6 +206,8 @@ class UserSettings extends HiveObject {
       alternativePosterDirectory: alternativePosterDirectory ?? this.alternativePosterDirectory,
       customTitles: customTitles ?? Map.from(this.customTitles),
       watchedItems: watchedItems ?? List.from(this.watchedItems),
+      recentlyOpenedMedia: recentlyOpenedMedia ?? List.from(this.recentlyOpenedMedia),
+      showRecentSection: showRecentSection ?? this.showRecentSection,
     );
   }
-} 
+}

@@ -18,7 +18,6 @@ class HomeScreen extends StatelessWidget {
         child: Consumer<MediaProvider>(
           builder: (context, mediaProvider, child) {
             if (mediaProvider.selectedDirectory.isEmpty) {
-              // Welcome screen pode rolar
               return SingleChildScrollView(
                 child: Column(
                   children: [

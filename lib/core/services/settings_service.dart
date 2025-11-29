@@ -29,11 +29,34 @@ class SettingsService extends ChangeNotifier {
 
       // Registra adaptadores
       if (!Hive.isAdapterRegistered(0)) {
-        Hive.registerAdapter(UserSettingsAdapter());
+        try {
+          Hive.registerAdapter(UserSettingsAdapter());
+        } catch (e) {
+          debugPrint("Erro a registrar UserSettingsAdapter: $e");
+        }
       }
 
-      // Abre as boxes
-      _settingsBox = await Hive.openBox<UserSettings>(_settingsBoxName);
+      // Tenta abrir o box
+      try {
+        _settingsBox = await Hive.openBox<UserSettings>(_settingsBoxName);
+      } catch (e) {
+        // Se falhar ao abrir (dados corrompidos/incompatíveis), deleta e tenta novamente
+        debugPrint('Erro ao abrir box do Hive (provavelmente dados incompatíveis): $e');
+        debugPrint('Deletando box corrompido e recriando...');
+        
+        try {
+          // Deleta o box corrompido
+          await Hive.deleteBoxFromDisk(_settingsBoxName);
+          debugPrint('Box deletado com sucesso');
+          
+          // Tenta abrir novamente
+          _settingsBox = await Hive.openBox<UserSettings>(_settingsBoxName);
+          debugPrint('Box recriado com sucesso');
+        } catch (deleteError) {
+          debugPrint('Erro ao deletar/recriar box: $deleteError');
+          rethrow;
+        }
+      }
 
       // Inicializa SharedPreferences
       _prefs = await SharedPreferences.getInstance();
@@ -54,7 +77,15 @@ class SettingsService extends ChangeNotifier {
     try {
       // Tenta carregar do Hive primeiro
       if (_settingsBox.isNotEmpty) {
-        _currentSettings = _settingsBox.get('settings');
+        try {
+          _currentSettings = _settingsBox.get('settings');
+        } catch (e) {
+          // Se houver erro ao ler (incompatibilidade de versão), limpa e recria
+          debugPrint('Erro ao ler configurações do Hive (provavelmente incompatibilidade de versão): $e');
+          debugPrint('Limpando dados antigos...');
+          await _settingsBox.clear();
+          _currentSettings = null;
+        }
       }
 
       // Se não encontrou no Hive, tenta carregar do SharedPreferences (migração)
@@ -283,6 +314,52 @@ class SettingsService extends ChangeNotifier {
     return _currentSettings?.getWatchedItems() ?? {};
   }
 
+  /// Adiciona uma mídia à lista de recentes
+  Future<void> addRecentlyOpenedMedia(String filePath) async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.addRecentlyOpenedMedia(filePath);
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Obtém a lista de mídias abertas recentemente
+  List<String> getRecentlyOpenedMedia() {
+    return _currentSettings?.getRecentlyOpenedMedia() ?? [];
+  }
+
+  /// Remove uma mídia da lista de recentes
+  Future<void> removeRecentlyOpenedMedia(String filePath) async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.removeRecentlyOpenedMedia(filePath);
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Limpa todas as mídias recentes
+  Future<void> clearRecentlyOpenedMedia() async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.clearRecentlyOpenedMedia();
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Define se a seção de recentes deve ser exibida
+  Future<void> setShowRecentSection(bool show) async {
+    if (_currentSettings == null) return;
+
+    _currentSettings!.showRecentSection = show;
+    await saveSettings();
+    notifyListeners();
+  }
+
+  /// Obtém se a seção de recentes está ativada
+  bool getShowRecentSection() {
+    return _currentSettings?.showRecentSection ?? true;
+  }
+
   /// Reseta todas as configurações
   Future<void> resetSettings() async {
     _currentSettings = UserSettings();
@@ -292,7 +369,9 @@ class SettingsService extends ChangeNotifier {
   }
 
   /// Fecha as conexões
+  @override
   Future<void> dispose() async {
     await _settingsBox.close();
+    super.dispose();
   }
 }

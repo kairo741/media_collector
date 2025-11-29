@@ -100,6 +100,25 @@ class MediaProvider extends ChangeNotifier {
       final success = await _playerService.openMediaFile(item.filePath);
       if (!success) {
         _setError('Não foi possível abrir o arquivo: ${item.fileName}');
+      } else {
+        // Se for um episódio de série, registra a série pai nos recentes
+        if (item.type == MediaType.series && item.seriesName != null) {
+          // Procura a série pai
+          try {
+            final series = _mediaItems.firstWhere(
+              (m) => m.type == MediaType.series && 
+                     (m.seriesName == item.seriesName || m.title == item.seriesName),
+            );
+            await _settingsService.addRecentlyOpenedMedia(series.filePath);
+          } catch (e) {
+            // Se não encontrou a série pai, registra o episódio mesmo
+            await _settingsService.addRecentlyOpenedMedia(item.filePath);
+          }
+        } else {
+          // Para filmes, registra normalmente
+          await _settingsService.addRecentlyOpenedMedia(item.filePath);
+        }
+        notifyListeners();
       }
     } catch (e) {
       _setError('Erro ao abrir arquivo: $e');
@@ -205,6 +224,9 @@ class MediaProvider extends ChangeNotifier {
   bool get enableThumbnails => _settingsService.currentSettings.enableThumbnails;
   String get thumbnailQuality => _settingsService.currentSettings.thumbnailQuality;
 
+  /// Obtém se a seção de recentes está ativada
+  bool get showRecentSection => _settingsService.getShowRecentSection();
+
   /// Define configurações de thumbnails
   Future<void> setThumbnailSettings({
     bool? enableThumbnails,
@@ -219,6 +241,12 @@ class MediaProvider extends ChangeNotifier {
   /// Define auto-scan na inicialização
   Future<void> setAutoScanOnStartup(bool enabled) async {
     await _settingsService.setAutoScanOnStartup(enabled);
+  }
+
+  /// Define se a seção de recentes deve ser exibida
+  Future<void> setShowRecentSection(bool show) async {
+    await _settingsService.setShowRecentSection(show);
+    notifyListeners();
   }
 
   /// Obtém extensões excluídas
@@ -358,6 +386,28 @@ class MediaProvider extends ChangeNotifier {
   /// Obtém a lista de itens assistidos
   Set<String> getWatchedItems() {
     return _settingsService.getWatchedItems();
+  }
+
+  /// Obtém as mídias abertas recentemente que não foram assistidas
+  List<MediaItem> getRecentlyOpenedUnwatchedMedia() {
+    final recentPaths = _settingsService.getRecentlyOpenedMedia();
+    final recentItems = <MediaItem>[];
+    
+    for (final path in recentPaths) {
+      // Procura o item na lista de mídia
+      try {
+        final item = _mediaItems.firstWhere((m) => m.filePath == path);
+        // Só adiciona se não estiver marcado como assistido
+        if (!_settingsService.isWatched(item.filePath)) {
+          recentItems.add(item);
+        }
+      } catch (e) {
+        // Item não encontrado na lista atual, pode ter sido removido
+        continue;
+      }
+    }
+    
+    return recentItems;
   }
 
   /// Calcula o tamanho total ocupado pelas thumbnails em disco

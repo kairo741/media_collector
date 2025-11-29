@@ -14,6 +14,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
   bool _enableThumbnails = true;
   String _thumbnailQuality = 'medium';
   bool _autoScanOnStartup = true;
+  bool _showRecentSection = true;
   List<String> _excludedExtensions = [];
   String _thumbnailsSize = '0 MB';
   bool _isCalculatingSize = false;
@@ -33,6 +34,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
       _enableThumbnails = mediaProvider.enableThumbnails;
       _thumbnailQuality = mediaProvider.thumbnailQuality;
       _autoScanOnStartup = true; // Será carregado do SettingsService
+      _showRecentSection = mediaProvider.showRecentSection;
       _excludedExtensions = List.from(mediaProvider.getExcludedExtensions());
       _alternativePosterDirectory = mediaProvider.getAlternativePosterDirectory();
     });
@@ -419,6 +421,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
             });
           },
         ),
+        SwitchListTile(
+          title: const Text('Mostrar seção de recentes'),
+          subtitle: const Text('Exibe as últimas mídias abertas no topo'),
+          value: _showRecentSection,
+          onChanged: (value) {
+            setState(() {
+              _showRecentSection = value;
+            });
+          },
+        ),
       ],
     );
   }
@@ -616,6 +628,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
       // Salva auto-scan
       await mediaProvider.setAutoScanOnStartup(_autoScanOnStartup);
+
+      // Salva configuração de exibição da seção de recentes
+      await mediaProvider.setShowRecentSection(_showRecentSection);
 
       // Salva pasta alternativa de posters
       await mediaProvider.setAlternativePosterDirectory(_alternativePosterDirectory);

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:media_collector/core/models/media_item.dart';
 import 'package:media_collector/ui/providers/media_provider.dart';
@@ -16,29 +17,64 @@ class MediaListView extends StatefulWidget {
 
 class _MediaListViewState extends State<MediaListView> with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _recentsScrollController = ScrollController();
+  bool _showLeftButton = false;
+  bool _showRightButton = false;
 
   @override
   void initState() {
     super.initState();
+    _recentsScrollController.addListener(_updateScrollButtons);
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _recentsScrollController.dispose();
     super.dispose();
+  }
+
+  void _updateScrollButtons() {
+    setState(() {
+      _showLeftButton = _recentsScrollController.hasClients && _recentsScrollController.offset > 0;
+      _showRightButton =
+          _recentsScrollController.hasClients &&
+          _recentsScrollController.offset < _recentsScrollController.position.maxScrollExtent;
+    });
+  }
+
+  void _scrollRecents(bool forward) {
+    if (!_recentsScrollController.hasClients) return;
+
+    final double offset = forward ? 700.0 : -700.0;
+    _recentsScrollController.animateTo(
+      _recentsScrollController.offset + offset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<MediaProvider>(
       builder: (context, mediaProvider, child) {
+        final recentUnwatchedItems = mediaProvider.showRecentSection
+            ? mediaProvider.getRecentlyOpenedUnwatchedMedia()
+            : <MediaItem>[];
+
         return Column(
           mainAxisSize: MainAxisSize.max,
           children: [
             const SizedBox(height: 10),
             _buildSearchAndFilters(context, mediaProvider),
             const SizedBox(height: 10),
-            Flexible(child: _buildMediaList(context, mediaProvider.filteredItems)),
+            Flexible(
+              child: _buildMediaList(
+                context,
+                mediaProvider.filteredItems,
+                recentUnwatchedItems: recentUnwatchedItems,
+              ),
+            ),
           ],
         );
       },
@@ -61,12 +97,12 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    mediaProvider.setSearchQuery('');
-                  },
-                )
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          mediaProvider.setSearchQuery('');
+                        },
+                      )
                     : null,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
@@ -85,7 +121,7 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
                   'Todos',
                   null,
                   mediaProvider.selectedFilter == null,
-                      () => mediaProvider.setFilter(null),
+                  () => mediaProvider.setFilter(null),
                 ),
                 const SizedBox(width: 8),
                 _buildFilterChip(
@@ -93,7 +129,7 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
                   'Filmes',
                   MediaType.movie,
                   mediaProvider.selectedFilter == MediaType.movie,
-                      () => mediaProvider.setFilter(MediaType.movie),
+                  () => mediaProvider.setFilter(MediaType.movie),
                 ),
                 const SizedBox(width: 8),
                 _buildFilterChip(
@@ -101,11 +137,14 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
                   'Séries',
                   MediaType.series,
                   mediaProvider.selectedFilter == MediaType.series,
-                      () => mediaProvider.setFilter(MediaType.series),
+                  () => mediaProvider.setFilter(MediaType.series),
                 ),
                 // Filtro de status assistido
                 const SizedBox(width: 20),
-                const SizedBox(height: 20, child: VerticalDivider(width: 10, thickness: 1, color: Colors.grey)),
+                const SizedBox(
+                  height: 20,
+                  child: VerticalDivider(width: 10, thickness: 1, color: Colors.grey),
+                ),
                 const SizedBox(width: 20),
                 const Text('Status:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(width: 16),
@@ -114,7 +153,7 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
                   'Todos',
                   null,
                   mediaProvider.watchedFilter == null,
-                      () => mediaProvider.setWatchedFilter(null),
+                  () => mediaProvider.setWatchedFilter(null),
                 ),
                 const SizedBox(width: 8),
                 _buildWatchedFilterChip(
@@ -122,7 +161,7 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
                   'Não assistidos',
                   false,
                   mediaProvider.watchedFilter == false,
-                      () => mediaProvider.setWatchedFilter(false),
+                  () => mediaProvider.setWatchedFilter(false),
                 ),
                 const SizedBox(width: 8),
                 _buildWatchedFilterChip(
@@ -130,7 +169,7 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
                   'Assistidos',
                   true,
                   mediaProvider.watchedFilter == true,
-                      () => mediaProvider.setWatchedFilter(true),
+                  () => mediaProvider.setWatchedFilter(true),
                 ),
               ],
             ),
@@ -140,10 +179,14 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
     );
   }
 
-  Widget _buildFilterChip(BuildContext context, String label, MediaType? filter, bool isSelected, VoidCallback onTap) {
-    final colorScheme = Theme
-        .of(context)
-        .colorScheme;
+  Widget _buildFilterChip(
+    BuildContext context,
+    String label,
+    MediaType? filter,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return FilterChip(
       label: Text(label),
       selected: isSelected,
@@ -153,14 +196,14 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
     );
   }
 
-  Widget _buildWatchedFilterChip(BuildContext context,
-      String label,
-      bool? filter,
-      bool isSelected,
-      VoidCallback onTap,) {
-    final colorScheme = Theme
-        .of(context)
-        .colorScheme;
+  Widget _buildWatchedFilterChip(
+    BuildContext context,
+    String label,
+    bool? filter,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return FilterChip(
       label: Text(label),
       selected: isSelected,
@@ -170,12 +213,16 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
     );
   }
 
-  Widget _buildMediaList(BuildContext context, List<MediaItem> items) {
-    if (items.isEmpty) {
+  Widget _buildMediaList(
+    BuildContext context,
+    List<MediaItem> items, {
+    List<MediaItem>? recentUnwatchedItems,
+  }) {
+    if (items.isEmpty && (recentUnwatchedItems == null || recentUnwatchedItems.isEmpty)) {
       return _buildEmptyState(context);
     }
 
-    // Grid responsivo
+    // Grid responsivo usando CustomScrollView para integrar recentes com o grid
     return LayoutBuilder(
       builder: (context, constraints) {
         int crossAxisCount = 2;
@@ -189,21 +236,230 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
         } else if (width > 500) {
           crossAxisCount = 3;
         }
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 0.68,
-          ),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final item = items[index];
-            return _MediaPosterCard(item: item);
-          },
+
+        return CustomScrollView(
+          slivers: [
+            // Seção de Recentes
+            if (recentUnwatchedItems != null && recentUnwatchedItems.isNotEmpty)
+              _buildRecentsSection(recentUnwatchedItems),
+
+            // Grid de mídias
+            if (items.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.68,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final item = items[index];
+                    return _MediaPosterCard(item: item);
+                  }, childCount: items.length),
+                ),
+              ),
+          ],
         );
       },
+    );
+  }
+
+  SliverToBoxAdapter _buildRecentsSection(List<MediaItem> recentUnwatchedItems) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _recentsScrollController.hasClients) {
+        _updateScrollButtons();
+      }
+    });
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Recentes',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '${recentUnwatchedItems.length} ${recentUnwatchedItems.length == 1 ? 'item' : 'itens'}',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 200,
+                  child: Stack(
+                    children: [
+                      ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(
+                          context,
+                        ).copyWith(dragDevices: {PointerDeviceKind.touch, PointerDeviceKind.mouse}),
+                        child: ListView.builder(
+                          controller: _recentsScrollController,
+                          scrollDirection: Axis.horizontal,
+                          itemCount: recentUnwatchedItems.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: SizedBox(
+                                width: 140,
+                                child: _buildRecentItem(recentUnwatchedItems[index]),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      if (_showLeftButton)
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 48,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [
+                                  Theme.of(context).colorScheme.surface.withAlpha(230),
+                                  Theme.of(context).colorScheme.surface.withAlpha(0),
+                                ],
+                              ),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.chevron_left, size: 32),
+                              onPressed: () => _scrollRecents(false),
+                              tooltip: 'Anterior',
+                            ),
+                          ),
+                        ),
+                      if (_showRightButton)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 48,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.centerRight,
+                                end: Alignment.centerLeft,
+                                colors: [
+                                  Theme.of(context).colorScheme.surface.withAlpha(230),
+                                  Theme.of(context).colorScheme.surface.withAlpha(0),
+                                ],
+                              ),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.chevron_right, size: 32),
+                              onPressed: () => _scrollRecents(true),
+                              tooltip: 'Próximo',
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentItem(MediaItem item) {
+    final isMovie = !(item.type == MediaType.series);
+
+    final posterPlaceholder = Container(
+      color: Colors.grey[900],
+      child: const Center(child: Icon(Icons.movie, size: 48, color: Colors.white24)),
+    );
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        if (!isMovie) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SeriesEpisodesScreen(seriesName: item.seriesName ?? item.title),
+            ),
+          );
+        } else {
+          context.read<MediaProvider>().openMediaFile(item);
+        }
+      },
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                child: item.posterUrl != null
+                    ? Image.file(
+                        File(item.posterUrl!),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) => posterPlaceholder,
+                      )
+                    : posterPlaceholder,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: SizedBox(
+                height: item.customTitle != null && item.title != item.fileName ? 40 : 25,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        item.displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (item.customTitle != null && item.title != item.fileName)
+                        Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -219,7 +475,10 @@ class _MediaListViewState extends State<MediaListView> with SingleTickerProvider
             style: TextStyle(fontSize: 18, color: Colors.grey[600], fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 8),
-          Text('Selecione uma pasta para começar a escanear', style: TextStyle(color: Colors.grey[500])),
+          Text(
+            'Selecione uma pasta para começar a escanear',
+            style: TextStyle(color: Colors.grey[500]),
+          ),
         ],
       ),
     );
@@ -233,9 +492,7 @@ class _MediaPosterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme
-        .of(context)
-        .colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final isMovie = !(item.type == MediaType.series);
     final isWatched = context.read<MediaProvider>().isWatched(item);
 
@@ -243,14 +500,17 @@ class _MediaPosterCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       onTap: () {
         if (!isMovie) {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => SeriesEpisodesScreen(seriesName: item.seriesName ?? item.title)));
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SeriesEpisodesScreen(seriesName: item.seriesName ?? item.title),
+            ),
+          );
         } else {
           context.read<MediaProvider>().openMediaFile(item);
         }
       },
-      onSecondaryTapDown: (TapDownDetails details) => _showContextMenu(context, details.globalPosition),
+      onSecondaryTapDown: (TapDownDetails details) =>
+          _showContextMenu(context, details.globalPosition),
       child: Card(
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -277,11 +537,9 @@ class _MediaPosterCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: Theme
-                            .of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       if (item.customTitle != null && item.title != item.fileName)
                         Text(
@@ -289,13 +547,10 @@ class _MediaPosterCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
-                          style: Theme
-                              .of(
-                            context,
-                          )
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.grey[600], fontStyle: FontStyle.italic),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                     ],
                   ),
@@ -353,8 +608,7 @@ class _MediaPosterCard extends StatelessWidget {
             errorBuilder: (context, error, stackTrace) => _buildPlaceholderImage(),
           ),
           // Indicador de status assistido
-          if (context.read<MediaProvider>().isWatched(item))
-            _buildWatchedFlag()
+          if (context.read<MediaProvider>().isWatched(item)) _buildWatchedFlag(),
         ],
       );
     }
@@ -362,8 +616,7 @@ class _MediaPosterCard extends StatelessWidget {
       children: [
         _buildPlaceholderImage(),
         // Indicador de status assistido
-        if (context.read<MediaProvider>().isWatched(item))
-          _buildWatchedFlag()
+        if (context.read<MediaProvider>().isWatched(item)) _buildWatchedFlag(),
       ],
     );
   }
@@ -376,7 +629,10 @@ class _MediaPosterCard extends StatelessWidget {
         angle: 0.6,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 30),
-          decoration: BoxDecoration(color: Color(0xffba1a1a), borderRadius: BorderRadius.circular(0)),
+          decoration: BoxDecoration(
+            color: Color(0xffba1a1a),
+            borderRadius: BorderRadius.circular(0),
+          ),
           child: Text("Assistido", style: TextStyle(fontSize: 20, letterSpacing: 5)),
         ),
       ),
@@ -393,30 +649,31 @@ class _MediaPosterCard extends StatelessWidget {
   void _showFileInfo(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: Text(item.title),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildInfoRow('Nome do arquivo', item.fileName),
-                  _buildInfoRow('Caminho', item.filePath),
-                  _buildInfoRow('Tipo', item.type == MediaType.movie ? 'Filme' : 'Série'),
-                  if (item.seriesName != null) _buildInfoRow('Nome da série', item.seriesName!),
-                  if (item.seasonNumber != null) _buildInfoRow('Temporada', item.seasonNumber.toString()),
-                  if (item.episodeNumber != null) _buildInfoRow('Episódio', item.episodeNumber.toString()),
-                  if (item.year != null) _buildInfoRow('Ano', item.year!),
-                  if (item.quality != null) _buildInfoRow('Qualidade', item.quality!),
-                  if (item.language != null) _buildInfoRow('Idioma', item.language!),
-                  _buildInfoRow('Tamanho', item.fileSizeFormatted),
-                  _buildInfoRow('Modificado', _formatDate(item.lastModified)),
-                ],
-              ),
-            ),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar'))],
+      builder: (context) => AlertDialog(
+        title: Text(item.title),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildInfoRow('Nome do arquivo', item.fileName),
+              _buildInfoRow('Caminho', item.filePath),
+              _buildInfoRow('Tipo', item.type == MediaType.movie ? 'Filme' : 'Série'),
+              if (item.seriesName != null) _buildInfoRow('Nome da série', item.seriesName!),
+              if (item.seasonNumber != null)
+                _buildInfoRow('Temporada', item.seasonNumber.toString()),
+              if (item.episodeNumber != null)
+                _buildInfoRow('Episódio', item.episodeNumber.toString()),
+              if (item.year != null) _buildInfoRow('Ano', item.year!),
+              if (item.quality != null) _buildInfoRow('Qualidade', item.quality!),
+              if (item.language != null) _buildInfoRow('Idioma', item.language!),
+              _buildInfoRow('Tamanho', item.fileSizeFormatted),
+              _buildInfoRow('Modificado', _formatDate(item.lastModified)),
+            ],
           ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar'))],
+      ),
     );
   }
 
@@ -437,8 +694,7 @@ class _MediaPosterCard extends StatelessWidget {
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour
-        .toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   void _showContextMenu(BuildContext context, Offset position) {
@@ -476,12 +732,20 @@ class _MediaPosterCard extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                context.read<MediaProvider>().getCustomTitle(item) != null ? Icons.edit : Icons.edit_outlined,
-                color: context.read<MediaProvider>().getCustomTitle(item) != null ? Colors.orange : Colors.grey,
+                context.read<MediaProvider>().getCustomTitle(item) != null
+                    ? Icons.edit
+                    : Icons.edit_outlined,
+                color: context.read<MediaProvider>().getCustomTitle(item) != null
+                    ? Colors.orange
+                    : Colors.grey,
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(context.read<MediaProvider>().getCustomTitle(item) != null ? 'Editar título' : 'Renomear'),
+              Text(
+                context.read<MediaProvider>().getCustomTitle(item) != null
+                    ? 'Editar título'
+                    : 'Renomear',
+              ),
             ],
           ),
         ),
@@ -502,13 +766,17 @@ class _MediaPosterCard extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                context.read<MediaProvider>().isWatched(item) ? Icons.visibility_off : Icons.visibility,
+                context.read<MediaProvider>().isWatched(item)
+                    ? Icons.visibility_off
+                    : Icons.visibility,
                 color: context.read<MediaProvider>().isWatched(item) ? Colors.red : Colors.green,
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
-                context.read<MediaProvider>().isWatched(item) ? 'Marcar como não assistido' : 'Marcar como assistido',
+                context.read<MediaProvider>().isWatched(item)
+                    ? 'Marcar como não assistido'
+                    : 'Marcar como assistido',
               ),
             ],
           ),
@@ -532,7 +800,9 @@ class _MediaPosterCard extends StatelessWidget {
               context.read<MediaProvider>().openMediaFile(item);
             } else {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => SeriesEpisodesScreen(seriesName: item.seriesName ?? item.title)),
+                MaterialPageRoute(
+                  builder: (_) => SeriesEpisodesScreen(seriesName: item.seriesName ?? item.title),
+                ),
               );
             }
             break;
@@ -553,19 +823,18 @@ class _MediaPosterCard extends StatelessWidget {
 
             showDialog(
               context: context,
-              builder: (context) =>
-                  RenameDialog(
-                    mediaItem: item,
-                    currentCustomTitle: currentCustomTitle,
-                    onRename: (newTitle) {
-                      mediaProvider.setCustomTitle(item, newTitle);
-                    },
-                    onRemoveCustomTitle: currentCustomTitle != null
-                        ? () {
-                      mediaProvider.removeCustomTitle(item);
-                    }
-                        : null,
-                  ),
+              builder: (context) => RenameDialog(
+                mediaItem: item,
+                currentCustomTitle: currentCustomTitle,
+                onRename: (newTitle) {
+                  mediaProvider.setCustomTitle(item, newTitle);
+                },
+                onRemoveCustomTitle: currentCustomTitle != null
+                    ? () {
+                        mediaProvider.removeCustomTitle(item);
+                      }
+                    : null,
+              ),
             );
             break;
           case 'info':

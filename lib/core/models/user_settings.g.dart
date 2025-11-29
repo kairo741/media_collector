@@ -28,13 +28,16 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       alternativePosterDirectory: fields[8] as String?,
       customTitles: (fields[9] as Map?)?.cast<String, String>(),
       watchedItems: (fields[10] as List?)?.cast<String>(),
+      recentlyOpenedMedia:
+          fields[11] == null ? [] : (fields[11] as List?)?.cast<String>(),
+      showRecentSection: fields[12] == null ? true : fields[12] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserSettings obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.selectedDirectory)
       ..writeByte(1)
@@ -56,7 +59,11 @@ class UserSettingsAdapter extends TypeAdapter<UserSettings> {
       ..writeByte(9)
       ..write(obj.customTitles)
       ..writeByte(10)
-      ..write(obj.watchedItems);
+      ..write(obj.watchedItems)
+      ..writeByte(11)
+      ..write(obj.recentlyOpenedMedia)
+      ..writeByte(12)
+      ..write(obj.showRecentSection);
   }
 
   @override
